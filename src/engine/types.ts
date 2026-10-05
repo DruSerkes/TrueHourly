@@ -60,6 +60,18 @@ export interface LineItem {
   note?: string;
 }
 
+/**
+ * A line item before the tax gross-up has run.
+ *
+ * Every contributor module (`cash.ts`, and `equity`/`health`/`perks` to come)
+ * knows its own face value, bucket, and confidence, but `salaryEquivalent`
+ * depends on the user's tax assumption, which is applied in one place
+ * (`tax.ts`) so the gross-up rule exists exactly once. Modelling the
+ * pre-gross-up state as its own type means no module ever has to write a
+ * placeholder `salaryEquivalent` that is wrong until someone overwrites it.
+ */
+export type LineItemDraft = Omit<LineItem, 'salaryEquivalent'>;
+
 /** The denominator, fully shown so the user can audit it. */
 export interface HoursBreakdown {
   /** Hours per working week. */

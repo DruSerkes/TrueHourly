@@ -169,6 +169,17 @@ export const TAX_RATE_PRESETS: readonly number[] = [0.22, 0.32, 0.42];
  */
 export const DEFAULT_DEFERRED_RATE = 0;
 
+/**
+ * Hard ceiling on any rate used as a gross-up divisor, decimal. ASSUMPTION, and
+ * a guard rather than a tax fact: `value / (1 - t)` explodes as `t` approaches
+ * 1 and inverts above it, so a stray `1.3` from a restored save would turn a
+ * $14,000 health premium into a negative number. 0.60 is above the highest
+ * plausible US combined marginal rate (top federal + FICA + California), so
+ * clamping here cannot silently truncate a real answer. A clamped rate always
+ * emits a warning (`tax.ts`) rather than being applied quietly.
+ */
+export const MAX_TAX_RATE = 0.6;
+
 // --- Hours and time off ---------------------------------------------------
 
 /** Default hours per working week. ASSUMPTION. */
@@ -197,6 +208,13 @@ export const DEFAULT_UNLIMITED_PTO_EXPECTED_DAYS = 15;
  * believing; it is never the real denominator.
  */
 export const NAIVE_ANNUAL_HOURS = 2080;
+
+/**
+ * Hours per week above which the engine warns that the headline treats every
+ * one of those hours as compensated (DESIGN.md §2.5). ASSUMPTION — a round
+ * threshold a little above a standard week, not a legal or medical finding.
+ */
+export const WARN_HOURS_PER_WEEK_THRESHOLD = 50;
 
 /** Weeks in a year. Used to convert day counts into weeks off. */
 export const WEEKS_PER_YEAR = 52;

@@ -1,7 +1,7 @@
 # True Hourly — Design
 
 **Status:** approved for build, v1
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-04
 
 ---
 
@@ -179,7 +179,8 @@ The engine emits structured `Warning[]` rather than the UI inferring them. Trigg
 - `hoursWorked` manually overridden
 - unlimited PTO selected (separation payout note)
 - 401(k) match entered but a vesting cliff also entered
-- sign-on bonus with a clawback period shorter than the amortization window
+- sign-on bonus with a clawback period **longer** than the expected tenure it is amortized
+  over — the headline is counting money that could still be repaid
 - any `estimated` line item contributing more than 10% of total comp
 
 ### 2.6 Off-headline notes
