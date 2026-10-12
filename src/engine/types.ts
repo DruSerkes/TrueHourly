@@ -72,6 +72,21 @@ export interface LineItem {
  */
 export type LineItemDraft = Omit<LineItem, 'salaryEquivalent'>;
 
+/**
+ * What a contributor module hands back.
+ *
+ * Several line items cannot be computed without checking a statutory limit
+ * (§415(c), the HSA and FSA limits, the commuter and §127 exclusions), and a
+ * clamped value must never be applied silently — the user typed one number and
+ * the engine used a smaller one (invariant 6). Returning the warnings alongside
+ * the items means the clamp is detected once, where it happens, instead of
+ * being re-derived by a second pass that could disagree with the first.
+ */
+export interface ContributionSet {
+  items: LineItemDraft[];
+  warnings: Warning[];
+}
+
 /** The denominator, fully shown so the user can audit it. */
 export interface HoursBreakdown {
   /** Hours per working week. */
@@ -84,6 +99,12 @@ export interface HoursBreakdown {
   holidayDays: number;
   /** Unpaid leave, in days per year. */
   unpaidLeaveDays: number;
+  /**
+   * Sabbatical weeks amortized to a yearly rate (`sabbaticalWeeks /
+   * sabbaticalCycleYears`). Weeks, not days, because a sabbatical is granted in
+   * weeks and the cycle makes it a fractional figure either way.
+   */
+  sabbaticalWeeksPerYear: number;
   /** Hours actually worked per year — the headline denominator. */
   hoursWorked: number;
   /** Days actually worked per year; drives per-day perks such as free meals. */
@@ -163,6 +184,17 @@ export interface HoursInput {
   holidayDays: number;
   /** Unpaid leave the user expects to take, in days per year. */
   unpaidLeaveDays: number;
+  /**
+   * Sabbatical length, weeks. A paid sabbatical is the same salary for fewer
+   * hours, so it belongs here rather than in the numerator — see `LeaveInput`.
+   */
+  sabbaticalWeeks: number;
+  /**
+   * Years between sabbaticals. Amortizes `sabbaticalWeeks` into a yearly rate:
+   * 6 weeks every 5 years is 1.2 weeks off every year you stay. A cycle of 0
+   * means no sabbatical, regardless of `sabbaticalWeeks`.
+   */
+  sabbaticalCycleYears: number;
   /**
    * Direct override of annual hours worked. `null` means derive it.
    * When set, `HoursBreakdown.overridden` is true.
@@ -261,10 +293,36 @@ export interface OptionsEquity {
   optionClass: 'iso' | 'nso';
 }
 
+/**
+ * How the employer states its 401(k) match. Discriminated because the two forms
+ * need different fields, not because one is optional (CLAUDE.md "Conventions").
+ *
+ * - `amount`          — a flat dollar figure the user already knows.
+ * - `percent_of_base` — the common plan-document form ("4% of salary"), which
+ *                       only becomes a dollar figure once base salary is known.
+ */
+export type EmployerMatch =
+  | {
+      type: 'amount';
+      /** Employer match, whole dollars per year. */
+      annualAmount: number;
+    }
+  | {
+      type: 'percent_of_base';
+      /** Match as a decimal share of base salary (0.04 = 4%). */
+      percentOfBase: number;
+      /**
+       * Dollar ceiling on the computed match, or `null` for no ceiling. Plans
+       * commonly cap a percentage match at a flat figure; a cap of `null` is
+       * "uncapped", which is not the same as a cap of 0.
+       */
+      capDollars: number | null;
+    };
+
 /** Retirement and savings (DESIGN.md §2.3, `retirement`). */
 export interface RetirementInput {
-  /** Employer 401(k) match, whole dollars per year. */
-  employerMatch: number;
+  /** Employer 401(k) match, as a flat amount or a percent of base. */
+  employerMatch: EmployerMatch;
   /** Years until the match is fully vested. >0 with a match drives a warning. */
   matchVestingYears: number;
   /** Employer non-elective / profit-sharing contribution, dollars per year. */
@@ -320,8 +378,12 @@ export interface InsuranceInput {
 export interface PerksInput {
   /** Free meals: valued as `mealValuePerDay × daysWorked`. */
   meals: { enabled: boolean; valuePerDay: number };
-  /** Commuter / transit / parking benefit, dollars per year. */
-  commuterBenefit: number;
+  /**
+   * Commuter / transit / parking benefit, dollars per **month**. Monthly
+   * because the §132(f) exclusion is a monthly limit and plans are stated that
+   * way; the engine multiplies by 12 after clamping.
+   */
+  commuterBenefitMonthly: number;
   /** Tuition or education reimbursement, dollars per year. Capped at the §127 limit. */
   tuitionReimbursement: number;
   /** Home office / phone / internet stipend, dollars per year. */
@@ -334,7 +396,15 @@ export interface PerksInput {
   stipendTaxTreatment: StipendTaxTreatment;
 }
 
-/** Paid leave beyond PTO (DESIGN.md §2.3, `leave`). */
+/**
+ * Paid leave beyond PTO (DESIGN.md §2.3, `leave`).
+ *
+ * Sabbatical is deliberately NOT here. A paid sabbatical is the same salary for
+ * fewer hours worked, which is the definition of a denominator input
+ * (invariant 2) — its fields live on `HoursInput` and it has no line item.
+ * Parental leave stays in the numerator because the denominator does not remove
+ * those weeks, and because it is only paid in a year leave is taken.
+ */
 export interface LeaveInput {
   /** Paid parental leave, weeks offered. */
   parentalLeaveWeeks: number;
@@ -345,10 +415,6 @@ export interface LeaveInput {
   parentalLeaveWeeklyRate: number;
   /** When false, parental leave contributes $0 and is listed as an off-headline note. */
   includeParentalLeaveInHeadline: boolean;
-  /** Sabbatical length, weeks. Amortized over `sabbaticalCycleYears`. */
-  sabbaticalWeeks: number;
-  /** Years between sabbaticals. Must be > 0 when `sabbaticalWeeks > 0`. */
-  sabbaticalCycleYears: number;
 }
 
 /** The single tax assumption (DESIGN.md §2.2). */

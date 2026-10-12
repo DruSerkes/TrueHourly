@@ -92,6 +92,12 @@ export const HDHP_OOP_MAX_FAMILY = 17_000;
 
 /**
  * Health FSA employee salary-reduction limit, 2026. Dollars per year.
+ *
+ * Note what this is NOT: a ceiling on an employer FSA seed. It caps what the
+ * EMPLOYEE may elect to defer; an employer non-elective contribution is not
+ * subject to it. `health.ts` therefore does not clamp the seed against this
+ * figure — no sourced employer ceiling has been found, and invariant 5 says an
+ * unsourced figure is not a constant to apply.
  * https://www.benefitresource.com/resources/plan-limits/
  */
 export const LIMIT_HEALTH_FSA = 3_400;
@@ -266,3 +272,12 @@ export const DEFAULT_LIQUIDITY_PROBABILITY = 0.3;
  * plan may offer less.
  */
 export const DEFAULT_ESPP_DISCOUNT = 0.15;
+
+/**
+ * Hard ceiling on the ESPP discount used as a gross-up divisor, decimal.
+ * ASSUMPTION, and a guard rather than a plan fact: the discount value is
+ * `contribution × d / (1 - d)`, which divides by zero at `d = 1` and inverts
+ * above it. §423 caps a qualified plan at 0.15, so 0.50 cannot truncate a real
+ * plan — it only stops a restored save from producing a negative benefit.
+ */
+export const MAX_ESPP_DISCOUNT = 0.5;

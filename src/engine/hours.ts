@@ -2,6 +2,7 @@
  * The denominator: hours actually worked in a year (DESIGN.md §2.1).
  *
  *     weeksOff    = (ptoDays + holidayDays + unpaidLeaveDays) / daysPerWeek
+ *                   + sabbaticalWeeks / sabbaticalCycleYears
  *     hoursWorked = hoursPerWeek x (52 - weeksOff)
  *     daysWorked  = (52 - weeksOff) x daysPerWeek
  *
@@ -10,6 +11,12 @@
  * they take 5 days or 25 — so its value appears here, as fewer hours for the
  * same money, and nowhere else. There is no PTO line item, and adding one while
  * also dividing by 2080 would double-count it.
+ *
+ * A **paid sabbatical** is the same thing one step out: full salary for a block
+ * of weeks not worked. It therefore belongs here too, amortized over its cycle
+ * (6 weeks every 5 years is 1.2 weeks off every year), and it has no line item.
+ * Earlier drafts of DESIGN.md §2.3 listed it as `taxable` in the numerator; that
+ * was the double-count this invariant exists to prevent, and it was corrected.
  */
 
 import { WEEKS_PER_YEAR } from './constants.ts';
@@ -56,7 +63,15 @@ export function computeHours(input: HoursInput): HoursBreakdown {
   const holidayDays = nonNegative(input.holidayDays);
   const unpaidLeaveDays = nonNegative(input.unpaidLeaveDays);
 
-  const weeksOff = (ptoDays + holidayDays + unpaidLeaveDays) / daysPerWeek;
+  // Amortized to a yearly rate. A cycle of 0 means no sabbatical rather than a
+  // division by zero — the guard is here and not at the input boundary because
+  // a restored save can hold weeks with no cycle.
+  const sabbaticalWeeks = nonNegative(input.sabbaticalWeeks);
+  const sabbaticalCycleYears = nonNegative(input.sabbaticalCycleYears);
+  const sabbaticalWeeksPerYear =
+    sabbaticalCycleYears > 0 ? sabbaticalWeeks / sabbaticalCycleYears : 0;
+
+  const weeksOff = (ptoDays + holidayDays + unpaidLeaveDays) / daysPerWeek + sabbaticalWeeksPerYear;
 
   // Clamped at 0, not allowed to go negative: more time off than there is year
   // is a data-entry error, and a negative denominator would produce a negative
@@ -72,6 +87,7 @@ export function computeHours(input: HoursInput): HoursBreakdown {
     ptoDays,
     holidayDays,
     unpaidLeaveDays,
+    sabbaticalWeeksPerYear,
     hoursWorked: overridden
       ? nonNegative(input.hoursWorkedOverride ?? 0)
       : nonNegative(derivedHoursWorked),

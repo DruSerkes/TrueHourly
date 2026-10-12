@@ -6,15 +6,18 @@
  * date becomes a field on `CompensationInput`; it is never read ambiently.
  * `__tests__/purity.test.ts` enforces this — fix the engine, not the test.
  *
- * Session 2 implements hours, cash, and the tax gross-up. Equity, retirement,
- * health, insurance, perks, and leave contribute nothing yet and the result
+ * Sessions 2-3 implement hours, cash, the tax gross-up, retirement, health,
+ * insurance, perks, and leave. Equity contributes nothing yet and the result
  * says so in a warning rather than quietly reporting a low number as finished.
  */
 
 import { computeCashItems } from './cash.ts';
 import { NAIVE_ANNUAL_HOURS, WARN_HOURS_PER_WEEK_THRESHOLD } from './constants.ts';
+import { computeHealthItems } from './health.ts';
 import { computeHours } from './hours.ts';
 import { nonNegative } from './numbers.ts';
+import { computePerksItems } from './perks.ts';
+import { computeRetirementItems } from './retirement.ts';
 import { applyGrossUp, taxWarnings } from './tax.ts';
 import type { CompensationInput, LineItem, TrueHourlyResult, Warning } from './types.ts';
 
@@ -108,9 +111,19 @@ function cashWarnings(input: CompensationInput): Warning[] {
 export function calculate(input: CompensationInput): TrueHourlyResult {
   const hours = computeHours(input.hours);
 
-  // Only cash contributes so far. Sessions 3-4 add their drafts to this array;
-  // nothing downstream of here needs to change when they do.
-  const drafts = [...computeCashItems(input.cash)];
+  // Each contributor module computes its own face values and reports any
+  // statutory clamp it had to apply. Session 4 appends equity here; nothing
+  // downstream of this point needs to change when it does.
+  const retirement = computeRetirementItems(input.retirement, input.cash.baseSalary);
+  const health = computeHealthItems(input.health, input.insurance);
+  const perks = computePerksItems({ perks: input.perks, leave: input.leave, hours });
+
+  const drafts = [
+    ...computeCashItems(input.cash),
+    ...retirement.items,
+    ...health.items,
+    ...perks.items,
+  ];
 
   const lineItems: LineItem[] = drafts.map((draft) => applyGrossUp(draft, input.tax));
 
@@ -142,12 +155,16 @@ export function calculate(input: CompensationInput): TrueHourlyResult {
       ...cashWarnings(input),
       ...ptoWarnings(input),
       ...taxWarnings(input.tax),
+      ...retirement.warnings,
+      ...health.warnings,
+      ...perks.warnings,
       {
         id: 'engine-partial',
         severity: 'caution',
         message:
-          'Only hours, salary, bonus and sign-on are counted so far. Equity, retirement, ' +
-          'health, insurance, perks and leave are not yet included, so these totals are low.',
+          'Equity is not yet included, so if this package has RSUs or options these totals ' +
+          'are low. Everything else — salary, bonus, sign-on, retirement, health, insurance, ' +
+          'perks and leave — is counted.',
       },
     ],
   };

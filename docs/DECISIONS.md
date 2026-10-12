@@ -295,3 +295,187 @@ by a test.
   tests. It mirrors `constants.ts` rather than hardcoding values, so a changed
   default fails a test instead of silently diverging. `src/state/` owns the real
   defaults from session 5; when it exists, this file should delegate to it.
+
+---
+
+## 2026-10-04 — Session 3: retirement + health + perks
+
+### Scope
+
+`retirement.ts`, `health.ts`, `perks.ts` created and wired into `calculate.ts`.
+Every non-equity line item in DESIGN.md §2.3 now contributes. Equity is still
+absent, so `engine-partial` remains — narrowed to name equity alone.
+
+### Fixtures
+
+**No disagreement.** With benefits landed, Fixture A matches DESIGN.md §4
+exactly: `tax_free` 18,435 (14,000 premium + 1,000 HSA + 3,435 meals),
+`tax_deferred` 7,200, meals 3,435 at 229 days × $15. Face value 223,635 and
+salary-equivalent 232,310.294… are each exactly $25,000 below §4's totals —
+the RSU line, to the cent. Nothing in DESIGN.md was edited.
+
+Enabled: the `bucket composition` block, plus a new `whole package except
+equity` block. That block's two figures are **not new hand-computed values** —
+they are §4's own totals less the $25,000 RSU line. Since the RSU line is
+`taxable`, it contributes the same $25,000 to both totals, so the subtraction is
+exact rather than approximate. It is the strongest available falsification
+before session 4 (twelve line items against an independently derived sum), and
+it becomes the `whole package` block when equity lands.
+
+Still skipped (6 tests): A's $120.64 / $124.85 and B's $90.48 / $93.64, all of
+which need the RSU line.
+
+### Three type changes the brief required
+
+1. **`RetirementInput.employerMatch: number` → `EmployerMatch` union.** The
+   brief asks for "a flat dollar amount or a percent-of-base with an optional
+   cap" — two shapes with different fields, which CLAUDE.md's conventions say is
+   a discriminated union, not optional fields. The cap is `capDollars: number |
+   null`, where `null` is *uncapped* and `0` is a real cap of zero; reading a
+   missing cap as 0 would silently delete a real match. Same `null`-vs-`0`
+   distinction as `hoursWorkedOverride`.
+2. **`PerksInput.commuterBenefit` → `commuterBenefitMonthly`.** The brief says
+   "monthly × 12, clamped to the monthly limit × 12", and §132(f) is a monthly
+   exclusion stated per month. Clamping monthly then annualizing matches both
+   the statute's unit and how plans are written.
+3. **`LeaveInput.sabbaticalWeeklyRate: number | null` added.**
+   _Superseded later the same session — see "Resolved" below: the field was
+   removed entirely when sabbatical moved to the denominator._ The brief's
+   formula is `(sabbaticalWeeks × weeklyRate) / cycleYears` and no such field
+   existed. `null` derives it from `baseSalary / 52` — the common case, since a
+   paid sabbatical normally pays full salary — and a derived rate is reported as
+   `confidence: 'estimated'` per invariant 6. An explicit number models a
+   part-paid sabbatical, which a derived-only design could not express.
+
+### Shared shape: `ContributionSet`
+
+The new modules return `{ items, warnings }` rather than a bare draft array.
+Several items need a statutory clamp, and a clamped value must not be applied
+silently (invariant 6). Returning the warnings from where the clamp happened
+means it is detected once; a second pass to re-derive "was this clamped?" could
+disagree with the first. `cash.ts` still returns a plain array — it has no
+clamps, and changing it would be churn.
+
+### Retirement
+
+- **§415(c) is applied to employer contributions only, and scaled
+  proportionally.** When match + profit sharing + student loan match exceed
+  `LIMIT_DEFINED_CONTRIBUTION_TOTAL`, all three are scaled by the same factor.
+  Any priority order (match first, profit sharing second) would be an invented
+  plan rule and would make the result depend on field order. Two honest
+  limitations, both stated in the warning text: the real §415(c) limit also
+  counts the employee's own elective deferrals, which the engine never asks for
+  (they are the user's money, not compensation, and §2.3 lists no such line
+  item), so actual headroom is smaller; and rounding to whole dollars after
+  scaling can leave the sum a dollar or two off the limit.
+- **ESPP uses `contribution × d / (1 − d)`, not `contribution × d`.** $10,000 of
+  payroll buys $11,765 of stock at a 15% discount, so the gain on money
+  contributed is 17.6%, not 15%. The divisor converts "discount off the market
+  price" into "gain on what you put in", which is the figure comparable to a
+  salary. `MAX_ESPP_DISCOUNT = 0.5` added to `constants.ts` as a guard (not a
+  plan fact) because `1 − d` reaches zero at d = 1 and inverts above it; §423
+  caps a qualified plan at 0.15, so the ceiling cannot truncate a real plan.
+- **ESPP is `taxable`, the other three are `tax_deferred`.** The ESPP gain lands
+  in a brokerage account; the rest land in a 401(k). Invariant 3.
+
+### Health and insurance
+
+- **Insurance lives in `health.ts`.** CLAUDE.md's layout has no `insurance.ts`
+  and the brief puts the premiums there. The items still carry
+  `category: 'insurance'` so the breakdown groups them as DESIGN.md §2.3 does.
+- **The HSA clamp is generous and says so.** The statutory limit is combined
+  employee + employer, and the engine only knows the employer side, so clamping
+  the employer contribution to the full limit leaves no room for the user's own.
+  The warning states this rather than the engine pretending to know the split.
+- **FSA: the brief's clamp is applied as written, and it is worth a second
+  look.** _Superseded — the clamp was removed; see "Resolved" below._
+  `LIMIT_HEALTH_FSA` ($3,400) is the *employee salary-reduction* limit;
+  an employer seed is generally not subject to it (an employer non-elective
+  contribution can exceed it, subject to separate rules). The brief said to
+  clamp to the FSA limit, so that is what is implemented, but a seed between
+  $3,400 and the real ceiling is currently under-counted. **Flagged for a
+  decision** — see "Open question" below.
+- **Group term life is treated as entirely tax-free with a note**, per §2.3
+  note 2. When `lifeCoverageAmount` exceeds the $50,000 ceiling the note admits
+  the direction of the error ("slightly generous") rather than staying silent.
+  No warning: the brief scoped warnings to clamps, and nothing is clamped here.
+
+### Perks and leave
+
+- **Meals use `hours.daysWorked`, never a flat 250.** This is the pairing that
+  keeps invariant 2 honest: PTO reduces the denominator *and* the value of a
+  per-day perk, and a flat day count would credit the user for lunches on days
+  they were on holiday. A test asserts that more PTO lowers the meals line.
+- **Stipends default to `taxable`** and flip to `tax_free` only via
+  `stipendTaxTreatment` (§2.3 note 1). The engine never guesses which it is; the
+  note explains the flip in both directions.
+- **Parental leave stays off the headline by default** (`includeParentalLeave
+  InHeadline`, already in the types). It is only paid in a year leave is taken,
+  so annualizing it would overstate every other year.
+- **Sabbatical is amortized over its cycle** — 6 weeks every 5 years is 1.2
+  weeks every year you stay. _Superseded: it shipped as a `taxable` line item
+  per §2.3 and was moved to the denominator later the same session. See
+  "Resolved" below. The amortization itself survived the move; only which side
+  of the division it lands on changed._
+- **Zero rows are omitted** for everything here, matching `cash.ts`. Only base
+  salary survives at $0, as the anchor row.
+
+### Resolved — both open questions, decided by the user on 2026-10-12
+
+**1. The employer FSA seed is no longer clamped.** No sourced ceiling on an
+employer non-elective FSA contribution could be found. `LIMIT_HEALTH_FSA`
+($3,400) is the employee *salary-reduction* limit and does not cap an employer
+seed, so clamping against it was under-counting a real benefit. Invariant 5
+settles it: an unsourced figure is not a constant to apply. The seed is now taken
+at face value, the `fsa-seed-clamped` warning is gone, and the test asserts the
+absence of the clamp rather than its presence. `LIMIT_HEALTH_FSA` stays in
+`constants.ts` — it is correctly sourced, it is simply not this limit — with a
+comment saying what it is not. If an employer ceiling is ever sourced, clamp here
+the way the HSA contribution is clamped.
+
+**2. Sabbatical moved to the denominator, and DESIGN.md was corrected.** A paid
+sabbatical is the same salary for weeks not worked, which is the definition of a
+denominator input (invariant 2). §2.3 listing it as a `taxable` line item was the
+double-count the invariant exists to prevent. What changed:
+
+- `HoursInput` gains `sabbaticalWeeks` and `sabbaticalCycleYears`; `LeaveInput`
+  loses both, and loses `sabbaticalWeeklyRate` entirely — a weekly pay rate is
+  only needed to value a numerator line item, and there is no longer one. This
+  also removes the `null`-derives-from-base-salary behaviour added earlier in
+  this session and the `estimated` confidence that went with it.
+- `HoursBreakdown` gains `sabbaticalWeeksPerYear` (= weeks / cycle), so the
+  denominator stays fully auditable — the user can see the 1.2 weeks that moved.
+- `weeksOff` in `hours.ts` adds the amortized figure. A cycle of 0 contributes 0
+  rather than dividing by zero, and the existing floor keeps `hoursWorked` from
+  going negative on an absurd input.
+- `perks.ts` loses the sabbatical block, and with it its `baseSalary` dependency
+  — `PerksContext` is now just perks, leave, and hours.
+- **DESIGN.md edited**: §2.1 formula and a new paragraph explaining why
+  sabbatical is a denominator input and parental leave is not; the §2.3 table row
+  deleted with a note saying the omission is deliberate; `HoursBreakdown` in §3
+  updated; `Last updated` bumped to 2026-10-12.
+- Tests moved from `perks.test.ts` to `hours.test.ts`, where the sweep now
+  asserts no line item mentions `sabbatical` either. One of them pins the actual
+  point: adding a sabbatical *raises* `trueHourly` while leaving `totals`
+  untouched, which is what "same money, fewer hours" means numerically.
+
+The parental-leave treatment is unchanged and is the contrast that makes the rule
+legible: the denominator does not remove parental-leave weeks, and the benefit is
+only paid in a year leave is taken, so it stays in the numerator behind an opt-in
+flag.
+
+### Deferred
+
+- **`equity.ts` is still the only missing module.** Session 4 adds all four
+  modes, enables the last 6 skipped fixture assertions, and removes
+  `engine-partial`.
+- **`matchVestingYears` is collected and unused.** DESIGN.md §2.5 lists "401(k)
+  match entered but a vesting cliff also entered" as a warning trigger; the
+  brief scoped warnings to clamps only, so it lands with session 4's warnings
+  work.
+- **`EsppInput.hasLookback` only changes the note's wording**, not the value.
+  Modelling the lookback properly needs a price path the engine does not have;
+  §2.3 is explicit that v1 undercounts here and says so.
+- **`insurance.lifeCoverageAmount` is used only for the note.** Splitting the
+  premium at the $50,000 ceiling is a v2 job per §2.3 note 2.
+- **Off-headline notes (§2.6) are still unmodelled**, unchanged from session 2.

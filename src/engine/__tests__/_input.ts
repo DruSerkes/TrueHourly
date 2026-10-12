@@ -45,6 +45,8 @@ export function defaultHours(): HoursInput {
     ptoPlan: { type: 'accrual', ptoDays: DEFAULT_PTO_DAYS, expectedAccruedBalanceDays: 0 },
     holidayDays: DEFAULT_HOLIDAY_DAYS,
     unpaidLeaveDays: 0,
+    sabbaticalWeeks: 0,
+    sabbaticalCycleYears: 0,
     hoursWorkedOverride: null,
     commuteMinutesOneWay: 0,
   };
@@ -62,7 +64,7 @@ export function defaultCash(): CashInput {
 
 export function defaultRetirement(): RetirementInput {
   return {
-    employerMatch: 0,
+    employerMatch: { type: 'amount', annualAmount: 0 },
     matchVestingYears: 0,
     profitSharing: 0,
     studentLoanMatch: 0,
@@ -86,7 +88,7 @@ export function defaultInsurance(): InsuranceInput {
 export function defaultPerks(): PerksInput {
   return {
     meals: { enabled: false, valuePerDay: DEFAULT_MEAL_VALUE },
-    commuterBenefit: 0,
+    commuterBenefitMonthly: 0,
     tuitionReimbursement: 0,
     homeOfficeStipend: 0,
     wellnessStipend: 0,
@@ -100,8 +102,6 @@ export function defaultLeave(): LeaveInput {
     parentalLeaveWeeks: 0,
     parentalLeaveWeeklyRate: 0,
     includeParentalLeaveInHeadline: false,
-    sabbaticalWeeks: 0,
-    sabbaticalCycleYears: 0,
   };
 }
 

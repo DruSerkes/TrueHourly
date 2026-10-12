@@ -7,8 +7,9 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { calculate } from '../calculate.ts';
 import { computeHours, ptoDaysOf } from '../hours.ts';
-import { defaultHours } from './_input.ts';
+import { defaultCash, defaultHours, defaultInput } from './_input.ts';
 
 describe('computeHours', () => {
   it('derives the DESIGN.md §2.1 example', () => {
@@ -158,5 +159,81 @@ describe('ptoDaysOf', () => {
 
   it('reads days expected to be taken under an unlimited plan', () => {
     expect(ptoDaysOf({ type: 'unlimited', expectedDaysTaken: 12 })).toBe(12);
+  });
+});
+
+describe('sabbatical (DESIGN.md §2.1)', () => {
+  // A paid sabbatical is full salary for weeks not worked, so its value is a
+  // smaller denominator — exactly like PTO (invariant 2). It has no line item;
+  // `perks.test.ts` asserts that it never acquires one.
+
+  it('amortizes weeks over the cycle and takes them out of hours worked', () => {
+    // Default: 15 PTO + 11 holidays = 5.2 weeks off, 46.8 worked, 1,872 hours.
+    // 6 weeks every 5 years adds 1.2 weeks off → 45.6 worked → 1,824 hours.
+    const hours = computeHours({
+      ...defaultHours(),
+      sabbaticalWeeks: 6,
+      sabbaticalCycleYears: 5,
+    });
+    expect(hours.sabbaticalWeeksPerYear).toBeCloseTo(1.2, 10);
+    expect(hours.hoursWorked).toBeCloseTo(1_824, 10);
+    expect(hours.daysWorked).toBeCloseTo(228, 10);
+  });
+
+  it('raises the true hourly rate, because the salary is unchanged', () => {
+    // The whole reason it belongs in the denominator: same money, fewer hours.
+    const base = { ...defaultCash(), baseSalary: 180_000 };
+    const without = calculate(defaultInput({ cash: base }));
+    const with_ = calculate(
+      defaultInput({
+        cash: base,
+        hours: { ...defaultHours(), sabbaticalWeeks: 6, sabbaticalCycleYears: 5 },
+      })
+    );
+    expect(with_.trueHourly.faceValue).toBeGreaterThan(without.trueHourly.faceValue);
+    expect(with_.totals.faceValue).toBe(without.totals.faceValue);
+  });
+
+  it('is inert when the cycle is 0, rather than dividing by zero', () => {
+    const hours = computeHours({
+      ...defaultHours(),
+      sabbaticalWeeks: 6,
+      sabbaticalCycleYears: 0,
+    });
+    expect(hours.sabbaticalWeeksPerYear).toBe(0);
+    expect(hours.hoursWorked).toBeCloseTo(1_872, 10);
+  });
+
+  it('is inert at 0 weeks, whatever the cycle', () => {
+    const hours = computeHours({
+      ...defaultHours(),
+      sabbaticalWeeks: 0,
+      sabbaticalCycleYears: 5,
+    });
+    expect(hours.sabbaticalWeeksPerYear).toBe(0);
+    expect(hours.hoursWorked).toBeCloseTo(1_872, 10);
+  });
+
+  it('launders negative and NaN inputs to 0', () => {
+    expect(
+      computeHours({ ...defaultHours(), sabbaticalWeeks: -6, sabbaticalCycleYears: 5 })
+        .sabbaticalWeeksPerYear
+    ).toBe(0);
+    expect(
+      computeHours({ ...defaultHours(), sabbaticalWeeks: NaN, sabbaticalCycleYears: NaN })
+        .sabbaticalWeeksPerYear
+    ).toBe(0);
+  });
+
+  it('cannot drive hours worked below 0 on its own', () => {
+    // A 520-week sabbatical every year is nonsense; it must floor at 0, not go
+    // negative and produce a negative hourly rate.
+    const hours = computeHours({
+      ...defaultHours(),
+      sabbaticalWeeks: 520,
+      sabbaticalCycleYears: 1,
+    });
+    expect(hours.hoursWorked).toBe(0);
+    expect(hours.daysWorked).toBe(0);
   });
 });

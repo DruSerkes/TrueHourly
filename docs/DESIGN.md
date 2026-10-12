@@ -1,7 +1,7 @@
 # True Hourly — Design
 
 **Status:** approved for build, v1
-**Last updated:** 2026-10-04
+**Last updated:** 2026-10-12
 
 ---
 
@@ -44,6 +44,7 @@ number higher than the naive one. That honesty is the differentiator.
 
 ```
 weeksOff    = (ptoDays + holidayDays + unpaidLeaveDays) / daysPerWeek
+            + sabbaticalWeeks / sabbaticalCycleYears
 hoursWorked = hoursPerWeek × (52 − weeksOff)
 daysWorked  = (52 − weeksOff) × daysPerWeek
 ```
@@ -65,6 +66,17 @@ expect to take," defaulting to 15. What unlimited PTO _does_ change is the separ
 > 2018, then reversed post-pandemic to 12.09 vs 11.36 across ~1,000 companies. The app should
 > not assert the folk claim. The payout difference, by contrast, is unambiguous.
 > Source: https://namely.com/blog/does-your-pto-plan-type-even-really-matter/
+
+**Sabbatical** is a denominator input for the same reason PTO is: a paid sabbatical is the
+same salary for a block of weeks not worked. It is amortized over its cycle — 6 weeks every
+5 years is 1.2 weeks off every year you stay — and it has **no line item**. An earlier draft
+of §2.3 listed it as a `taxable` line item; that was the double-count invariant 2 exists to
+prevent, and putting the weeks in the numerator while also dividing by a denominator that
+still contained them would have inflated the headline twice over.
+
+Parental leave is the one paid-leave item that stays in the numerator, because the
+denominator does **not** remove those weeks and because it is only paid in a year leave is
+actually taken (hence `includeParentalLeaveInHeadline`, default false).
 
 **Commute** is collected but excluded from the headline denominator. It appears in a secondary
 "hours the job consumes" view, because unpaid commute time is a real cost but folding it into
@@ -121,7 +133,12 @@ A bracket engine would be more precise about a question the app isn't asking.
 | perks      | Professional development budget                   | tax_free     | 0                                   |
 | insurance  | Employer-paid life / AD&D / disability premium    | tax_free²    | 0                                   |
 | leave      | Paid parental leave (weeks × weekly rate)         | taxable      | 0                                   |
-| leave      | Sabbatical accrual (weeks ÷ cycle years)          | taxable      | 0                                   |
+
+**Sabbatical is deliberately not in this table.** It is a denominator input (§2.1), not a
+line item. **Employer FSA seed is not clamped**: the $3,400 figure in `constants.ts` is the
+employee *salary-reduction* limit and does not cap an employer non-elective contribution. No
+sourced employer ceiling has been found, and invariant 5 says an unsourced figure is not a
+constant to apply, so the seed is taken at face value.
 
 ¹ Cash stipends are generally taxable wages; accountable-plan reimbursements may not be.
 Default to taxable and let the user flip it, with a tooltip.
@@ -225,6 +242,7 @@ interface HoursBreakdown {
   ptoDays: number;
   holidayDays: number;
   unpaidLeaveDays: number;
+  sabbaticalWeeksPerYear: number; // sabbaticalWeeks / sabbaticalCycleYears
   hoursWorked: number;
   daysWorked: number;
   overridden: boolean;

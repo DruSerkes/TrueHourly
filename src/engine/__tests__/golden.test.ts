@@ -12,18 +12,17 @@
  *
  * ── Why parts of this file are skipped ──────────────────────────────────
  *
- * Fixtures A and B are whole-package figures: they include a 401(k) match,
- * employer health premium, HSA contribution, free meals, and public RSUs, none
- * of which the engine computes yet (session 2 covers hours + cash + tax). Those
- * assertions sit in `describe.skip` blocks and are enabled as the sessions that
- * implement them land:
+ * Fixtures A and B are whole-package figures. As of session 3 the engine
+ * computes everything in them except the public RSU grant, so the only
+ * assertions still skipped are the ones that need equity:
  *
- *   - session 3 (retirement, health, perks) → the `tax_free` / `tax_deferred` totals
- *   - session 4 (equity)                    → the RSU contribution, then the headline totals
+ *   - session 3 (retirement, health, perks) → ENABLED: the `tax_free` and
+ *     `tax_deferred` totals, the meals line, and the whole package minus equity
+ *   - session 4 (equity) → still skipped: the RSU contribution and therefore
+ *     the headline totals and both hourly figures
  *
- * The inputs below are already complete, so enabling a block is deleting
- * `.skip` and nothing else. Everything that depends only on hours and cash runs
- * today — that is the part of the fixture session 2 can actually falsify.
+ * The inputs below have been complete since session 2, so enabling a block is
+ * deleting `.skip` and nothing else.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -67,7 +66,10 @@ function fixtureAInput(hoursPerWeek: number): CompensationInput {
       vestYears: 4,
       cliffMonths: 0,
     },
-    retirement: { ...defaultRetirement(), employerMatch: 7_200 },
+    retirement: {
+      ...defaultRetirement(),
+      employerMatch: { type: 'amount', annualAmount: 7_200 },
+    },
     health: {
       ...defaultHealth(),
       employerPremiumContribution: 14_000,
@@ -95,7 +97,7 @@ describe('Fixture A — NYC mid-level, public company, 45h weeks (DESIGN.md §4)
     });
 
     it('works 229 days a year', () => {
-      // 45.8 x 5 = 229 — drives the $15/day meals line in session 3
+      // 45.8 x 5 = 229 — drives the $15/day meals line below
       expect(result.hours.daysWorked).toBeCloseTo(229, CENTS);
     });
 
@@ -143,6 +145,39 @@ describe('Fixture A — NYC mid-level, public company, 45h weeks (DESIGN.md §4)
     });
   });
 
+  describe('whole package except equity (enabled: session 3)', () => {
+    // Not a new hand-computed figure: these are DESIGN.md §4's own totals less
+    // the one line the engine cannot produce yet. §4 gives the RSU grant as
+    // $25,000/yr, and it is `taxable`, so it contributes the same $25,000 to
+    // both totals and subtracting it is exact rather than approximate.
+    //
+    // This is the strongest assertion available before session 4: it pins the
+    // sum of twelve line items against an independently derived number, and it
+    // becomes the `whole package` block below the moment equity lands.
+    it('totals $223,635 at face value — $248,635 less the $25,000 RSU line', () => {
+      expect(result.totals.faceValue).toBeCloseTo(248_635 - 25_000, CENTS);
+    });
+
+    it('totals $232,310.29 in salary-equivalent dollars', () => {
+      // 257,310.29 - 25,000. The gross-up applies to the 18,435 of tax_free
+      // money only, so removing a taxable line shifts both totals equally.
+      expect(result.totals.salaryEquivalent).toBeCloseTo(257_310.29 - 25_000, CENTS);
+    });
+
+    it('still warns that equity is missing', () => {
+      expect(result.warnings.map((w) => w.id)).toContain('engine-partial');
+    });
+
+    it('emits no clamp warning — nothing in this package hits a statutory limit', () => {
+      // The $1,000 HSA contribution is well inside the self-only limit and the
+      // $7,200 match is nowhere near §415(c). A clamp firing here would mean a
+      // limit is being applied to the wrong quantity.
+      const ids = result.warnings.map((w) => w.id);
+      expect(ids).not.toContain('hsa-contribution-clamped');
+      expect(ids).not.toContain('annual-additions-limit-clamped');
+    });
+  });
+
   describe.skip('whole package (enable in session 4, once equity lands)', () => {
     it('totals $248,635 at face value', () => {
       // 223,000 taxable + 18,435 tax_free + 7,200 tax_deferred
@@ -165,7 +200,7 @@ describe('Fixture A — NYC mid-level, public company, 45h weeks (DESIGN.md §4)
     });
   });
 
-  describe.skip('bucket composition (enable in session 3, once benefits land)', () => {
+  describe('bucket composition (enabled: session 3)', () => {
     const sumBucket = (bucket: string): number =>
       result.lineItems
         .filter((item) => item.bucket === bucket)
