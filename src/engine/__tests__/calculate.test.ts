@@ -138,7 +138,10 @@ describe('other warnings', () => {
     expect(result.trueHourly.faceValue).toBe(0);
   });
 
-  it('admits the engine is still partial', () => {
-    expect(warningIds(defaultInput())).toContain('engine-partial');
+  it('no longer claims to be a partial engine', () => {
+    // Session 4 completed the engine, so `engine-partial` was removed rather
+    // than left to say something untrue. Asserted as an absence so it cannot
+    // creep back in without a failing test.
+    expect(warningIds(defaultInput())).not.toContain('engine-partial');
   });
 });

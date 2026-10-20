@@ -20,6 +20,7 @@ import {
   LIMIT_HSA_SELF_ONLY,
 } from './constants.ts';
 import { dollars, nonNegative } from './numbers.ts';
+import { hsaContributionClamped } from './warnings.ts';
 import type {
   ContributionSet,
   HealthInput,
@@ -63,17 +64,7 @@ export function computeHealthItems(
 
   const hsaLimit = hsaLimitFor(health.coverageTier);
   const hsa = capped(health.employerHsaContribution, hsaLimit);
-  if (hsa.clamped) {
-    warnings.push({
-      id: 'hsa-contribution-clamped',
-      severity: 'caution',
-      message:
-        `The employer HSA contribution you entered is above the 2026 ${health.coverageTier === 'family' ? 'family' : 'self-only'} ` +
-        `HSA limit of $${hsaLimit.toLocaleString('en-US')}, so it has been capped at the limit. ` +
-        'That limit covers your own contributions as well as your employer’s, so the room ' +
-        'left for you is smaller still.',
-    });
-  }
+  if (hsa.clamped) warnings.push(hsaContributionClamped(health.coverageTier, hsaLimit));
   if (hsa.value > 0) {
     items.push({
       id: 'employer-hsa',

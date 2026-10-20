@@ -8,9 +8,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { MAX_TAX_RATE } from '../constants.ts';
-import { applyGrossUp, clampRate, grossUp, taxWarnings } from '../tax.ts';
+import { applyGrossUp, clampRate, grossUp } from '../tax.ts';
 import type { LineItemDraft, TaxBucket, TaxInput } from '../types.ts';
-import { defaultTax } from './_input.ts';
 
 function item(bucket: TaxBucket, annualValue: number): LineItemDraft {
   return { id: 'x', label: 'x', category: 'health', bucket, annualValue, confidence: 'entered' };
@@ -107,24 +106,5 @@ describe('applyGrossUp', () => {
   });
 });
 
-describe('taxWarnings', () => {
-  it('says nothing at the default rate', () => {
-    expect(taxWarnings(defaultTax())).toEqual([]);
-  });
-
-  it('warns when a rate was clamped, rather than applying it silently', () => {
-    // Invariant 6: the user typed a number and the engine used a different one.
-    expect(taxWarnings(tax(1.3)).map((w) => w.id)).toContain('tax-rate-clamped');
-  });
-
-  it('warns when the deferred rate was clamped', () => {
-    expect(taxWarnings(tax(0.32, 5)).map((w) => w.id)).toContain('deferred-rate-clamped');
-  });
-
-  it('explains the illiquidity when the deferred rate is raised', () => {
-    const warning = taxWarnings(tax(0.32, 0.2)).find((w) => w.id === 'deferred-rate-raised');
-
-    expect(warning?.severity).toBe('info');
-    expect(warning?.message).toContain('59.5');
-  });
-});
+// `taxWarnings` moved to `warnings.ts` in session 4 and is tested in
+// `warnings.test.ts`. This file keeps the arithmetic; that one keeps the prose.

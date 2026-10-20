@@ -1,7 +1,7 @@
 # True Hourly — Design
 
 **Status:** approved for build, v1
-**Last updated:** 2026-10-12
+**Last updated:** 2026-10-20
 
 ---
 
@@ -114,8 +114,8 @@ A bracket engine would be more precise about a question the app isn't asking.
 | Category   | Item                                              | Bucket       | Default                             |
 | ---------- | ------------------------------------------------- | ------------ | ----------------------------------- |
 | cash       | Base salary                                       | taxable      | —                                   |
-| cash       | Annual bonus (target %)                           | taxable      | 0                                   |
-| cash       | Sign-on bonus, amortized over expected tenure     | taxable      | 0, tenure 4y                        |
+| cash       | Annual bonus (target %)                           | taxable³     | 0                                   |
+| cash       | Sign-on bonus, amortized over expected tenure     | taxable⁴     | 0, tenure 4y                        |
 | equity     | RSUs (public)                                     | taxable      | 0                                   |
 | equity     | RSUs / options (private)                          | taxable      | **$0 headline**, scenarios separate |
 | retirement | 401(k) employer match                             | tax_deferred | 0                                   |
@@ -144,6 +144,18 @@ constant to apply, so the seed is taken at face value.
 Default to taxable and let the user flip it, with a tooltip.
 ² Employer-paid group term life is tax-free only up to $50,000 of coverage; above that the
 excess premium is imputed income. v1 treats it as tax_free with a note; v2 can model the split.
+³ `bonusTreatment` (`'target' | 'earned'`, default `'target'`) decides the row's **confidence,
+never its value**. A target is real money if hit, but whether it is hit depends on performance,
+so `'target'` marks the row `estimated` — it renders visually distinct and becomes eligible for
+the 10%-of-total estimate warning (§2.5). A user whose bonus is contractual, already declared,
+or reliably paid in full selects `'earned'`. Same pattern as footnote 1: the distinction is
+real, the app cannot observe it, and the engine does not guess.
+⁴ The amortized sign-on is `estimated` whenever `expectedTenureYears > 1`, because spreading a
+one-time payment over a predicted tenure makes the per-year figure a projection. It has **no**
+treatment flag, unlike footnote 3: a sign-on has already been paid in full, so the uncertainty
+is in the divisor rather than in whether the money arrives — and the engine can see the divisor
+without asking. At a one-year window the whole bonus lands in one year, which is what actually
+happens, so the row is `entered`.
 
 **ESPP** deserves a note: a 15% discount with a 6-month lookback is one of the most
 underrated items in tech comp. v1 models the discount value as
@@ -170,12 +182,50 @@ scenarios = {
   modest: perYear,                    // exit at roughly the last round's valuation
   strong: perYear × strongMultiple,
 }
-expectedValue = perYear × liquidityProbability   // shown only when the user opts in
+expectedValue = showExpectedValue
+                  ? perYear × liquidityProbability
+                  : 0                              // opt-in enforced in the ENGINE
 ```
 
 Defaults, all user-adjustable and **labelled as assumptions, not facts**:
-`commonDiscount = 0.30`, `expectedDilution = 0.25`, `strongMultiple = 3`,
-`liquidityProbability = 0.30`.
+`commonDiscount = 0.30`, `expectedDilution = 0.25`, `strongMultiple = 3`.
+
+**`expectedValue` is zeroed by the engine, not hidden by the UI.** It is the shakiest figure
+the app can produce, and an opt-in guarded only by a conditional in a component is not an
+opt-in. The probability behind it is still reported in `assumptions` while the value is
+hidden, so the UI can label the toggle itself ("show expected value at 20%").
+
+**`liquidityProbability` has three sources**, most specific first, and the one used is
+reported in `scenarios.liquidityProbabilityBasis` so the UI can say which:
+
+| Basis     | Source                                                    |
+| --------- | --------------------------------------------------------- |
+| `entered` | the user typed a probability (`0` is a real answer)       |
+| `stage`   | observed exit rate for the company's funding stage        |
+| `default` | neither given → `0.20`                                    |
+
+The stage table is **sourced, not invented** — the one figure in the private-equity model
+that is not purely editorial:
+
+| Stage at grant | Probability of any exit |
+| -------------- | ----------------------- |
+| Seed           | 13%                     |
+| Series A       | 19%                     |
+| Series B       | 25%                     |
+| Series C       | 33%                     |
+| Series D+      | 39%                     |
+
+It rises monotonically because later-stage companies have already survived the filters that
+kill earlier ones. Caveats that keep it a default rather than a prediction: it is a secondary
+source, the underlying population is not fully specified, and "exit" covers both an
+acqui-hire and a tenfold IPO — only one of which makes a grant worth anything.
+
+The `0.20` fallback is deliberately **below** the midpoint of that table, because most
+startups fail. Earlier-stage companies carry materially higher risk, and the base rate across
+all startups sits nearer the bottom of that table than its middle — so with the stage unknown,
+the conservative figure is the defensible one. Overstating the probability makes a worthless
+grant look like compensation, which is the error this app exists to correct; understating it
+makes the headline a floor, which is the error it can live with.
 
 The headline uses `zero`. The UI shows the range with a plain-language explanation of each
 haircut. This is the single most distinctive thing in the app — it is the honest answer to
@@ -199,6 +249,10 @@ The engine emits structured `Warning[]` rather than the UI inferring them. Trigg
 - sign-on bonus with a clawback period **longer** than the expected tenure it is amortized
   over — the headline is counting money that could still be repaid
 - any `estimated` line item contributing more than 10% of total comp
+- a 401(k) match entered alongside a vesting period — the headline counts money
+  that is not yet the user's
+- nothing entered at all: Fixture C requires a warning on a degenerate input, and
+  `$0.00/hr` with no explanation reads as a broken calculator
 
 ### 2.6 Off-headline notes
 
@@ -252,14 +306,31 @@ interface EquityScenarios {
   zero: number;
   modest: number;
   strong: number;
-  expectedValue: number;
+  expectedValue: number; // 0 unless showExpectedValue — see §2.4
+  liquidityProbabilityBasis: "entered" | "stage" | "default";
   assumptions: Record<string, number>;
 }
+
+type BonusTreatment = "target" | "earned"; // §2.3 note 3
+type FundingStage =
+  | "seed"
+  | "series_a"
+  | "series_b"
+  | "series_c"
+  | "series_d_plus";
 
 interface Warning {
   id: string;
   severity: "info" | "caution";
   message: string;
+}
+
+interface Note {
+  id: string;
+  title: string;
+  body: string;
+  amount?: number; // dollars; never summed into any total
+  confidence: Confidence;
 }
 
 interface TrueHourlyResult {
@@ -270,8 +341,14 @@ interface TrueHourlyResult {
   baseHourlyNaive: number;
   equityScenarios?: EquityScenarios;
   warnings: Warning[];
+  notes: Note[]; // off-headline cards (§2.6) — never affect a total
 }
 ```
+
+`notes` is a separate array rather than a `LineItem` with an "off-headline" flag
+on purpose. A flag is something a future summing loop can forget to check, and the
+first time it does, the headline silently double-counts a one-time asset — the same
+class of error invariant 2 exists to prevent.
 
 ---
 
@@ -430,5 +507,8 @@ Six Claude Code sessions, each ending green and committable. See `session-prompt
 - [Venable — 2026 IRS Dollar Limits on Benefits and Contributions](https://www.venable.com/insights/publications/2025/11/2026-irs-dollar-limits-on-benefits-contributions)
 - [Benefit Resource — 2026 Plan Limits](https://www.benefitresource.com/resources/plan-limits/)
 - [Namely — Does Your PTO Plan Type Even Really Matter?](https://namely.com/blog/does-your-pto-plan-type-even-really-matter/)
+- [Zabella — Startup exit statistics](https://www.zabella.net/blog/startup-exit-statistics) —
+  exit probability by funding stage (§2.4). Secondary source; the primary dataset is still to
+  be tracked down.
 - [Clockify — PTO Statistics](https://clockify.me/pto-statistics)
 - [Cloudflare — Migrate from Pages to Workers](https://developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages/)

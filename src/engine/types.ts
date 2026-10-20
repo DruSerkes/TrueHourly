@@ -87,6 +87,19 @@ export interface ContributionSet {
   warnings: Warning[];
 }
 
+/**
+ * What `equity.ts` hands back: a `ContributionSet` plus, for a private grant,
+ * the scenario range that sits beside the headline rather than in it.
+ *
+ * `scenarios` is absent for every other mode — including `unknown`, which has
+ * no shares to run a scenario on. Absent rather than a zeroed object, so the UI
+ * can key the whole scenario panel off its presence without having to ask what
+ * a `strong` of 0 is supposed to mean.
+ */
+export interface EquityContribution extends ContributionSet {
+  scenarios?: EquityScenarios;
+}
+
 /** The denominator, fully shown so the user can audit it. */
 export interface HoursBreakdown {
   /** Hours per working week. */
@@ -124,8 +137,25 @@ export interface EquityScenarios {
   modest: number;
   /** Dollars per year at `modest × strongMultiple`. */
   strong: number;
-  /** `modest × liquidityProbability`. Shown only when the user opts in. */
+  /**
+   * `modest × liquidityProbability`, or **0 when the user has not opted in**
+   * via `PrivateEquity.showExpectedValue`.
+   *
+   * Zeroed in the engine rather than left to the UI to hide. This is the
+   * shakiest figure the app can produce, and an opt-in enforced only by a
+   * forgotten `if` in a component is not an opt-in (invariant 6).
+   */
   expectedValue: number;
+  /**
+   * Where `assumptions.liquidityProbability` came from, so the UI can label it
+   * honestly instead of presenting three quite different things as one number:
+   *
+   * - `entered` — the user typed a probability.
+   * - `stage`   — derived from the company's funding stage via
+   *               `LIQUIDITY_PROBABILITY_BY_STAGE`; sourced, not invented.
+   * - `default` — neither was given, so `DEFAULT_LIQUIDITY_PROBABILITY`.
+   */
+  liquidityProbabilityBasis: 'entered' | 'stage' | 'default';
   /**
    * The assumptions that produced the above, echoed back for display so the UI
    * never has to reach into the input. Decimal rates and plain multiples;
@@ -143,6 +173,31 @@ export interface Warning {
   message: string;
 }
 
+/**
+ * An off-headline note (DESIGN.md §2.6).
+ *
+ * Real but not per-hour, so it renders as a card beside the result rather than
+ * as a line item. A note must never affect `totals` or `trueHourly` — that is
+ * the whole reason it is a separate array and not a `LineItem` with a flag.
+ * PTO payout at separation is the clearest case: an accrued balance is a
+ * genuine asset, but it is paid once, on leaving, and dividing it by hours
+ * worked would answer a question nobody asked.
+ */
+export interface Note {
+  /** Stable machine id, e.g. `'pto-separation-payout'`. */
+  id: string;
+  /** Short card heading. */
+  title: string;
+  /** Plain-language body, already user-facing. */
+  body: string;
+  /**
+   * Optional dollar estimate. Whole dollars, one-time unless the body says
+   * otherwise. Never summed into any total.
+   */
+  amount?: number;
+  confidence: Confidence;
+}
+
 /** The complete engine output. */
 export interface TrueHourlyResult {
   hours: HoursBreakdown;
@@ -156,6 +211,8 @@ export interface TrueHourlyResult {
   /** Present only for `equity.type === 'private'`. */
   equityScenarios?: EquityScenarios;
   warnings: Warning[];
+  /** Off-headline cards (DESIGN.md §2.6). Never contribute to any total. */
+  notes: Note[];
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +224,33 @@ export interface TrueHourlyResult {
  * accountable plan (tax-free). Defaults to taxable per DESIGN.md §2.3 note 1.
  */
 export type StipendTaxTreatment = 'taxable' | 'tax_free';
+
+/**
+ * How much the user trusts their own bonus figure.
+ *
+ * - `target` — the plan number ("10% of base"). Real money if hit, but it
+ *              depends on company and individual performance, so the line item
+ *              is `estimated` and renders visually distinct (invariant 6).
+ * - `earned`  — a figure the user actually expects to be paid: a history of
+ *              full payouts, a contractual guarantee, or a bonus already
+ *              declared. The line item is `entered`.
+ *
+ * Same shape and same reasoning as `StipendTaxTreatment`: the app cannot know
+ * which situation the user is in, the distinction changes how the number should
+ * be presented, and the engine does not guess. Defaults to `target`, which is
+ * what DESIGN.md §2.3 calls the field ("Annual bonus (target %)").
+ */
+export type BonusTreatment = 'target' | 'earned';
+
+/**
+ * The funding stage of a private company at the time of the grant.
+ *
+ * Used only to pick a liquidity probability from
+ * `LIQUIDITY_PROBABILITY_BY_STAGE`. `series_d_plus` is a bucket, not a round:
+ * the observed exit rate flattens out past Series D and splitting it further
+ * would imply precision the source does not support.
+ */
+export type FundingStage = 'seed' | 'series_a' | 'series_b' | 'series_c' | 'series_d_plus';
 
 /** Hours and time off — the denominator's inputs (DESIGN.md §2.1). */
 export interface HoursInput {
@@ -228,6 +312,12 @@ export interface CashInput {
   baseSalary: number;
   /** Target annual bonus as a decimal share of base (0.10 = 10%). */
   bonusTargetPct: number;
+  /**
+   * Whether to treat `bonusTargetPct` as a target the user may not hit or as
+   * money they expect to be paid. Drives the line item's `confidence` only —
+   * never its value, which is `baseSalary × bonusTargetPct` either way.
+   */
+  bonusTreatment: BonusTreatment;
   /** Sign-on bonus, whole dollars, paid once. */
   signOnBonus: number;
   /** Years over which the sign-on is amortized — the tenure the user expects. */
@@ -270,8 +360,21 @@ export interface PrivateEquity {
   expectedDilution: number;
   /** Multiple on the last round for the `strong` scenario. Assumption. Default 3. */
   strongMultiple: number;
-  /** Probability of any liquidity event, decimal. Assumption. Default 0.30. */
-  liquidityProbability: number;
+  /**
+   * Funding stage at the time of the grant, or `null` if the user has not said.
+   * Picks a sourced liquidity probability from
+   * `LIQUIDITY_PROBABILITY_BY_STAGE` when `liquidityProbability` is `null`.
+   */
+  stage: FundingStage | null;
+  /**
+   * Probability of any liquidity event, decimal, or `null` to derive it.
+   *
+   * `null` means "work it out": from `stage` if one is set, otherwise from
+   * `DEFAULT_LIQUIDITY_PROBABILITY`. The same `number | null` convention
+   * `hoursWorkedOverride` and `EmployerMatch.capDollars` use — `null` is
+   * "derive", and `0` is a real answer meaning "this will never exit".
+   */
+  liquidityProbability: number | null;
   /** When true the UI may show `expectedValue`. Never enters the headline. */
   showExpectedValue: boolean;
 }

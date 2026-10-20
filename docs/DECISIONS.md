@@ -479,3 +479,383 @@ flag.
 - **`insurance.lifeCoverageAmount` is used only for the note.** Splitting the
   premium at the $50,000 ceiling is a v2 job per §2.3 note 2.
 - **Off-headline notes (§2.6) are still unmodelled**, unchanged from session 2.
+
+---
+
+## 2026-10-12 — Session 4: equity + warnings + off-headline notes
+
+**Scope.** `equity.ts` (all four modes plus `none`), `warnings.ts`, `notes.ts`,
+the `notes` array on `TrueHourlyResult`, and the full golden fixtures. The
+engine is now feature-complete against DESIGN.md §2. No UI, no price lookup, no
+network call.
+
+### Fixtures: enabled, not adjusted
+
+All six previously-skipped assertions now pass, including both hourly figures to
+the cent in Fixtures A and B. **No expected value in `golden.test.ts` was
+edited, and the engine agreed with DESIGN.md §4 on the first run** — the only
+test that failed was Fixture C, and it failed for a real reason (below). The
+`whole package except equity` block from session 3 was deleted rather than kept:
+it existed to pin twelve line items against §4's totals *minus* the RSU line,
+and the `whole package` block it was standing in for now asserts the undiminished
+figures. Keeping both would mean maintaining two statements of the same fact.
+
+Added alongside them: the `taxable` bucket total ($223,000), which could not be
+asserted before equity, and a direct assertion on the RSU line ($25,000).
+
+### `no-compensation-entered` — a gap the fixtures caught
+
+Fixture C requires a degenerate input to return `trueHourly` of 0 "with a
+warning". Through sessions 2 and 3 that was satisfied **by accident**:
+`engine-partial` fired on every result, including an empty one. Removing it
+exposed a result with zero warnings, and the fixture failed.
+
+The fix is the warning the case deserved all along. An empty form is the app's
+first-load state, and `$0.00/hr` with no explanation reads as a broken
+calculator rather than an unanswered question. Note what it deliberately is
+**not**: a `no-hours-worked` warning. The denominator on a default input is a
+perfectly good 1,872 hours — it is the numerator that is empty, and conflating
+the two would send the user to the wrong input. Added to DESIGN.md §2.5.
+
+This is the clearest return the golden fixtures have paid so far: a requirement
+written down independently of the code caught a regression introduced by
+*deleting* something, which no amount of testing the new feature would have
+found.
+
+### `warnings.ts` — catalogue here, triggers where the facts are
+
+The split matters and is not the obvious one. **Every warning id, severity and
+message is constructed in `warnings.ts`.** But detection stays in the module
+that can see the condition, and the warning travels back through
+`ContributionSet`.
+
+Why not move the triggers too:
+
+- A statutory clamp is only observable inside the module that clamped. Re-deriving
+  "did the §415(c) limit bind?" in a second pass is exactly the duplication
+  `ContributionSet` was introduced to avoid in session 3, and the second pass can
+  disagree with the first.
+- It would make `warnings.ts` import `retirement.ts` while `retirement.ts` imports
+  `warnings.ts`. ESM tolerates that cycle; it should not have to.
+
+So the module exports ~20 single-warning factories plus three aggregators:
+`inputWarnings` (everything derivable from the input and the denominator),
+`taxWarnings` (moved here from `tax.ts`, which keeps `clampRate` and the
+arithmetic), and `compositionWarnings` (judged only after the totals exist).
+`calculate.ts` is now a list of spreads with no warning prose in it at all.
+
+`match-vesting-cliff` is the trigger this reorganization was needed for.
+DESIGN.md §2.5 asked for it in session 3 and the brief scoped warnings to clamps,
+so `matchVestingYears` sat collected and unused. It fires from `retirement.ts`,
+which is the only place that knows the match resolved to a non-zero figure — a 0%
+match with a five-year schedule is not worth a warning.
+
+### The 10%-estimated rule is implemented and currently dormant
+
+DESIGN.md §2.5 asks for a warning on "any `estimated` line item contributing more
+than 10% of total comp". It is implemented in `compositionWarnings` and unit-tested
+against synthetic line items, because **no engine line item carries
+`confidence: 'estimated'` today** — every value is either entered by the user or
+$0 with `unknown`. (The PTO payout *note* is estimated, but a note is not a line
+item.) `warnings.test.ts` asserts that premise directly, so the first estimated
+line item a later session adds inherits a working warning rather than a silent
+one, and the dormancy cannot go unnoticed.
+
+Two design points inside it: the threshold is **strictly greater than** 10%, so
+the threshold itself is not a warning; and several offenders collapse into **one**
+warning naming them all, because duplicate ids in a list the UI renders by key is
+a bug waiting to happen.
+
+### Equity
+
+**`public`.** `shares × price / vestYears`, `taxable`, `entered`. The honesty
+problem here is not the number — a share price is observable — it is the *shape*,
+so both grant-shape warnings fire: `equity-initial-grant-not-steady-state` always,
+and `equity-cliff-contingent` when there is a cliff. They are shared by all three
+grant-shaped modes rather than written three times.
+
+**`private`.** The headline row is **$0 with `confidence: 'unknown'`**, and the
+value lives in `equityScenarios` beside it. The row is emitted rather than omitted
+so the breakdown shows that equity exists and is being counted at zero, instead of
+looking as though the user forgot to enter it.
+
+`privateEquityScenarios` follows §2.4 exactly: common discount, then dilution,
+then annualize. All four assumptions are clamped to `[0, 1]` (multiples to
+non-negative) and echoed back in `scenarios.assumptions` with `vestYears`, so the
+UI can show its work without reaching into the input. The clamp is not pedantry: a
+`commonDiscount` above 1 flips the sign and turns a worthless grant into a
+positive number, which is the one failure mode that would make this module
+actively misleading rather than merely uncertain.
+
+**`options`.** Intrinsic value only, floored at 0 — an underwater option is worth
+$0 today, never a liability, and a negative row would imply the user owes
+something. `options-exercise-cost` fires on **every** options grant, not just
+underwater ones, because `strike × shares` is real money the holder must find and
+the line item ignores it. `iso-amt-exposure` fires only for ISOs.
+
+**`unknown`.** $0, `confidence: 'unknown'`, and a warning that calls the headline
+a floor and points at the private estimator.
+
+**`none`.** Nothing: no row, no warning, no scenario panel.
+
+What equity deliberately does **not** do: discount for time, walk a vesting
+schedule month by month, or price an option with Black-Scholes. The first needs a
+clock (invariant 1 forbids it) and the last needs a volatility assumption with no
+source (invariant 5 forbids it). The per-year figure is a flat
+`grantValue / vestYears`, and the cliff and steady-state warnings exist precisely
+because that flatness is a simplification the user should see.
+
+`vestYears` is floored at `MIN_VEST_YEARS = 1`, mirroring `MIN_TENURE_YEARS` in
+`cash.ts`: `grantValue / 0` is `Infinity`, which Fixture C forbids anywhere in the
+result, and attributing the whole grant to year one is what actually happens when
+a grant vests immediately.
+
+### Off-headline notes (§2.6)
+
+A new `notes: Note[]` on `TrueHourlyResult`, in `notes.ts`. Shape mirrors
+`Warning`: stable id, user-facing prose, plus an optional `amount` and a
+`confidence`.
+
+**A separate array, not a `LineItem` with a flag.** A flag is something a future
+summing loop can forget to check, and the first time it does, the headline
+silently double-counts a one-time asset — the same class of error invariant 2
+exists to prevent. `notes.test.ts` pins it directly: adding a 15-day accrued
+balance worth over $10,000 must leave all four headline figures byte-identical.
+
+The one note with a figure is the PTO separation payout, and its divisor was a
+real decision. The daily rate is `baseSalary / (daysPerWeek × 52)` — **scheduled**
+days, about 260 — not `daysWorked`. Payroll computes a payout against the days the
+contract pays for, which includes the PTO and holidays themselves; dividing by
+days actually worked would inflate the rate by exactly the time off, and the
+balance being valued is denominated in those same scheduled days. It is
+`estimated`, not `entered`: the user gave a balance they *expect* to hold, and the
+rate is the app's own derivation.
+
+Three cards — severance, on-call, remote-vs-in-office — are **unconditional**.
+That is deliberate: §2.6 lists them as cards precisely because the app cannot
+price them without inventing figures (invariant 5), and a card that only appeared
+once the user had thought to enter something would never prompt anybody. They
+carry `confidence: 'unknown'` and no `amount`. The remote card quantifies the
+commute when one was entered, which is the one place `commuteMinutesOneWay`
+finally gets used.
+
+### Deferred
+
+- **`EquityScenarios.expectedValue` is computed unconditionally**, while
+  `PrivateEquity.showExpectedValue` is still only a display flag. That is the
+  right split — the engine reports, the UI decides — but it means session 5 must
+  actually honour the flag. §2.4 says expected value is shown "only when the user
+  opts in".
+- **No line item is `estimated` yet**, so the 10%-of-total warning is dormant. See
+  above.
+- **`EsppInput.hasLookback`, `insurance.lifeCoverageAmount`** — unchanged from
+  session 3; both affect wording only, both documented in §2.3.
+- **`PRIVATE_EQUITY_ASSUMPTION_DEFAULTS`** is exported from `equity.ts` for
+  `src/state/` to seed a new input from in session 5. It duplicates
+  `PRIVATE_EQUITY_DEFAULTS` in `__tests__/_input.ts`, which is a test fixture and
+  deliberately separate — the test file mirrors `constants.ts` so a changed default
+  shows up as a failing test rather than a silently divergent fixture.
+- **Still zero commits in the repo.** Four sessions of green work, uncommitted.
+
+---
+
+## 2026-10-20 — Session 4 follow-up: the three flags, decided
+
+All three open flags from the session-4 summary, resolved by the user. Commits
+are handled by the user per session and are no longer tracked as an open item
+here.
+
+### 1. The bonus is a user choice, not a hardcoded confidence
+
+The flag asked whether the annual bonus row should be `estimated` rather than
+`entered`. The answer was neither-as-stated: **add an input and let the user
+decide.** `CashInput.bonusTreatment: 'target' | 'earned'`, defaulting to
+`'target'`.
+
+This is the better answer and it has a precedent in the codebase.
+`PerksInput.stipendTaxTreatment` already does exactly this for a stipend that
+may be wages or may be an accountable-plan reimbursement: the distinction is
+real, the app cannot observe it, so the user flips a flag and the engine does
+not guess. Hardcoding `estimated` would have been the app asserting something
+about every user's bonus plan that it cannot know. The rule being followed is
+not "a bonus is an estimate" — it is **"the engine does not guess"**, and a
+fixed value either way violates it.
+
+What `bonusTreatment` changes: the row's `confidence`, and the `(target)` suffix
+on its label. What it never changes: `annualValue`, which is
+`baseSalary × bonusTargetPct` in both cases, and the `taxable` bucket. Tests
+assert the two valuations are identical so the field cannot drift into affecting
+the arithmetic.
+
+Consequence worth noting: **this makes the 10%-of-total estimate warning live.**
+It was dormant in the session-4 entry above because no line item was ever
+`estimated`. A default-`'target'` bonus is, so `warnings.test.ts` lost its
+"confirms no engine line item is estimated yet" premise test and gained an
+integration block through `calculate` — a 20% target fires the warning (17% of
+the package), a 10% target does not (9%), and an `'earned'` bonus of any size
+never does.
+
+Fixture A is unaffected in value and now exercises the threshold usefully: its
+10% target is `estimated` at 7.2% of the package, so the row renders as an
+estimate without an interruption. That assertion replaced the now-false comment
+claiming "every figure here was entered".
+
+**Still open: the sign-on bonus has the same problem.** _Superseded — decided
+the same day; see "Sign-on bonus" below._ `signOnItem` divides a one-time
+payment by `expectedTenureYears` — the user's guess about the future — and the
+resulting row is marked `entered`. It was raised in the session-4 summary and
+the decision covered the bonus only, so it is deliberately unchanged.
+
+### 2. `showExpectedValue` is now enforced in the engine
+
+`privateEquityScenarios` returns `expectedValue: 0` unless
+`PrivateEquity.showExpectedValue` is set. DESIGN.md §2.4 said the figure is shown
+"only when the user opts in", and leaving that to UI code that does not exist
+yet meant the opt-in was guarded by a conditional nobody had written. One
+forgotten `if` in session 5 or 6 would have put the shakiest number in the app
+on screen unrequested, which is precisely what invariant 6 exists to prevent.
+
+The cost of enforcing it is nil: `calculate` is pure and sub-millisecond, and the
+app already recalculates on every keystroke, so a UI toggle produces the number
+instantly.
+
+`assumptions.liquidityProbability` is still reported while the value is hidden —
+the UI needs the figure to label the toggle itself ("show expected value at
+20%"). Hiding a result must not hide the assumption behind it.
+
+### 3. Liquidity probability is now sourced and stage-aware
+
+`DEFAULT_LIQUIDITY_PROBABILITY` was 0.30, described in `constants.ts` as "the
+shakiest one in the file". It is now a three-tier resolution with an actual
+source behind the middle tier.
+
+**`LIQUIDITY_PROBABILITY_BY_STAGE`** — seed 13%, Series A 19%, Series B 25%,
+Series C 33%, Series D+ 39% — from a study of startup exit outcomes by funding
+stage (https://www.zabella.net/blog/startup-exit-statistics, added to DESIGN.md's
+source list). Monotonic because later-stage companies have already survived the
+filters that kill earlier ones. A test asserts that monotonicity directly, so a
+transcription error that inverted two rows would fail rather than quietly
+mis-value a package.
+
+Where it lives and why that was a judgment call: these sit in the **App
+defaults** section, not under "2026 statutory limits", even though they are
+sourced. The statutory block is explicitly facts-with-a-citation that change
+annually; these are a secondary source summarizing an empirical distribution
+whose population is not fully specified, and "exit" is doing real work in it — an
+acqui-hire and a tenfold IPO are both exits and only one makes a grant worth
+anything. So: better-grounded than a round number, not a prediction about any
+particular company. Annotated as such, with a `TODO` to find the primary dataset.
+
+**Resolution order** (`resolveLiquidityProbability`, exported and tested
+directly), most specific first:
+
+1. a probability the user typed — they know their company better than a table
+2. the stage table, when a stage is set
+3. `DEFAULT_LIQUIDITY_PROBABILITY`, now **0.20**
+
+Two type changes this required. `PrivateEquity.liquidityProbability` became
+`number | null`, following the `hoursWorkedOverride` / `EmployerMatch.capDollars`
+convention where `null` means "derive" — necessary here because **`0` is a real
+answer**: "this will never exit" is a legitimate thing for a user to say, and a
+non-nullable number would make it indistinguishable from "not specified". And
+`PrivateEquity.stage: FundingStage | null` was added, with `series_d_plus` as a
+bucket rather than a round because the observed rate flattens past Series D and
+splitting it further would imply precision the source does not support.
+
+`EquityScenarios` gained **`liquidityProbabilityBasis: 'entered' | 'stage' |
+'default'`**. Without it the UI would present a user's own guess, a sourced
+figure, and a fallback as though they were one kind of claim. With it the UI can
+say "19%, the observed rate for Series A companies" — which is invariant 6
+applied to an assumption rather than to a dollar figure.
+
+**Why 0.20 and not the table's midpoint (25%).** Because **most startups fail.**
+Earlier-stage companies carry materially higher risk, and the base rate across
+all startups sits nearer the bottom of that table than its middle, so with the
+stage unknown the conservative figure is the defensible one. 0.20 sits between
+the seed and Series B figures: wrong in a knowable direction rather than
+flattering by default.
+
+The asymmetry of the two errors is the point. Overstating the probability makes a
+worthless grant look like compensation — the exact error this app exists to
+correct. Understating it makes the headline a floor, which is an error the app
+can live with and already tells the user about elsewhere (`equity-unknown` says
+so in as many words).
+
+A test pins the fallback below the Series C rate and above seed, so a future edit
+cannot drift it upward unnoticed.
+
+_Correction, same day: an earlier draft of this paragraph justified 0.20 by
+guessing that users who skip the stage question are more likely to be at
+early-stage companies. That was my inference, not the reasoning behind the
+decision, and it is a weaker argument — it rests on an unevidenced claim about
+user behaviour rather than on startup survival rates. The figure is unchanged;
+the justification above is the real one._
+
+`PRIVATE_EQUITY_ASSUMPTION_DEFAULTS` seeds `liquidityProbability: null` and
+`stage: null` rather than the fallback figure — an untouched form has made no
+claim, and seeding a number would make it look like a user who had chosen 20%.
+`esppDiscount` was removed from the test fixture's equivalent bundle, where it
+never belonged: it is not a private-equity assumption, and its presence meant the
+bundle could not be spread cleanly into a `PrivateEquity`.
+
+### 4. The three unconditional note cards stay, for now
+
+Severance, on-call and remote-vs-in-office still render on every result,
+including an empty one. Confirmed as-is on the grounds that it is a layout
+judgment best made with a layout in front of you.
+
+**Revisit in session 5**, once the result panel exists. The engine needs no
+change either way — `notes` is just data and the UI already decides whether and
+when to render each card. The option to weigh first is collapsing all three into
+a single "Questions worth asking" card: same content, one box instead of three,
+and much less noise beside an empty $0 result on first load.
+
+### Gates
+
+`typecheck`, `lint`, `build` clean. 505 tests passing, none skipped — up from 478,
+with the additions in `cash.test.ts` (bonus treatment), `equity.test.ts`
+(opt-in enforcement and all three probability tiers) and `warnings.test.ts`
+(the estimate warning, now reachable through `calculate`).
+
+### 5. Sign-on bonus — `estimated` when amortized, and no treatment flag
+
+Decided immediately after the above, closing the item it left open.
+
+`signOnItem` now returns `confidence: 'estimated'` whenever
+`expectedTenureYears > 1`, and `'entered'` at a one-year window. Spreading a
+one-time payment over a predicted tenure makes the per-year figure a projection,
+and a projection is an estimate — so the row renders visually distinct and is
+eligible for the 10%-of-total warning, exactly like a bonus target.
+
+**Why no `signOnTreatment` flag, when the bonus got one.** The two uncertainties
+are different in kind, and the difference decides the design:
+
+- A **bonus target** may never be paid at all. Whether it gets paid depends on
+  company and individual performance, and only the user has any idea how likely
+  that is. The engine cannot see it, so it asks.
+- A **sign-on** has already been paid, in full, in cash. Nothing about the money
+  is uncertain. What is uncertain is purely the arithmetic of spreading it, and
+  that is visible in the input: if `expectedTenureYears` is 4, the per-year
+  figure is a projection; if it is 1, the whole bonus is attributed to year one,
+  which is simply what happened.
+
+Adding a flag would have meant asking the user to confirm something the engine
+can already read off the divisor. The rule stays "the engine does not guess" —
+and here it does not have to, because there is nothing to guess.
+
+At the `MIN_TENURE_YEARS` floor the row is `entered`: a tenure of 0 is laundered
+to 1, and a bonus counted against a single year is a fact rather than a
+prediction. A test pins that boundary from both sides so the floor and the
+confidence rule cannot drift apart.
+
+`warnings.test.ts` gained a second route to the estimate warning from a different
+kind of estimate: a $100,000 sign-on over four years is $25,000/yr of a $205,000
+package (12%) and fires it; the same $100,000 over one year does not, because
+there is no projection in it.
+
+Unchanged: the value, the `taxable` bucket, and the clawback warning, which asks
+a separate question (whether the clawback outlasts the tenure) and is unaffected
+by how the row's confidence is labelled.
+
+**Gates after this change:** typecheck, lint, build clean; **512 tests passing**,
+none skipped.

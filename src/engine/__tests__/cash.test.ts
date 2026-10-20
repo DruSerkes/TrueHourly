@@ -49,8 +49,91 @@ describe('bonusItem', () => {
     expect(item.annualValue).toBe(10_000);
   });
 
+  describe('bonusTreatment changes confidence, never value', () => {
+    // The engine does not guess whether a target gets paid — the user says.
+    // Same pattern as `stipendTaxTreatment` (DESIGN.md §2.3 note 1).
+    const base = { ...defaultCash(), baseSalary: 180_000, bonusTargetPct: 0.1 };
+
+    it('defaults to a target, which is an estimate', () => {
+      const item = bonusItem({ ...base, bonusTreatment: 'target' });
+      expect(item.confidence).toBe('estimated');
+      expect(item.annualValue).toBe(18_000);
+    });
+
+    it('is entered when the user says the bonus is earned', () => {
+      const item = bonusItem({ ...base, bonusTreatment: 'earned' });
+      expect(item.confidence).toBe('entered');
+      expect(item.annualValue).toBe(18_000);
+    });
+
+    it('values both identically — only the confidence moves', () => {
+      expect(bonusItem({ ...base, bonusTreatment: 'target' }).annualValue).toBe(
+        bonusItem({ ...base, bonusTreatment: 'earned' }).annualValue
+      );
+    });
+
+    it('drops "(target)" from the label when it is earned', () => {
+      expect(bonusItem({ ...base, bonusTreatment: 'target' }).label).toBe('Annual bonus (target)');
+      expect(bonusItem({ ...base, bonusTreatment: 'earned' }).label).toBe('Annual bonus');
+    });
+
+    it('says in the note which way it was counted', () => {
+      expect(bonusItem({ ...base, bonusTreatment: 'target' }).note).toContain('not guaranteed');
+      expect(bonusItem({ ...base, bonusTreatment: 'earned' }).note).toContain('expect to be paid');
+    });
+
+    it('stays taxable either way — this is not a bucket question', () => {
+      expect(bonusItem({ ...base, bonusTreatment: 'target' }).bucket).toBe('taxable');
+      expect(bonusItem({ ...base, bonusTreatment: 'earned' }).bucket).toBe('taxable');
+    });
+  });
+
   it('is 0 when there is no bonus', () => {
     expect(bonusItem({ ...defaultCash(), baseSalary: 180_000 }).annualValue).toBe(0);
+  });
+});
+
+describe('signOnItem confidence', () => {
+  // Estimated whenever the figure is a projection, which is what spreading a
+  // one-time payment over a predicted tenure makes it. No treatment flag, unlike
+  // the bonus: a sign-on has already been paid, so the uncertainty is in the
+  // divisor, not in whether the money arrives — and the engine can see the
+  // divisor without asking.
+  it('is estimated when amortized over more than a year', () => {
+    const item = signOnItem({ ...defaultCash(), signOnBonus: 40_000, expectedTenureYears: 4 });
+    expect(item.confidence).toBe('estimated');
+    expect(item.annualValue).toBe(10_000);
+  });
+
+  it('is entered when the whole bonus lands in one year', () => {
+    const item = signOnItem({ ...defaultCash(), signOnBonus: 40_000, expectedTenureYears: 1 });
+    expect(item.confidence).toBe('entered');
+    expect(item.annualValue).toBe(40_000);
+  });
+
+  it('is entered at the floor too — a 0-year tenure becomes 1, not a projection', () => {
+    const item = signOnItem({ ...defaultCash(), signOnBonus: 40_000, expectedTenureYears: 0 });
+    expect(item.confidence).toBe('entered');
+  });
+
+  it('says which way it was counted', () => {
+    expect(
+      signOnItem({ ...defaultCash(), signOnBonus: 40_000, expectedTenureYears: 4 }).note
+    ).toContain('a prediction');
+    expect(
+      signOnItem({ ...defaultCash(), signOnBonus: 40_000, expectedTenureYears: 1 }).note
+    ).toContain('in full against a single year');
+  });
+
+  it('stays taxable either way', () => {
+    for (const years of [1, 4]) {
+      const item = signOnItem({
+        ...defaultCash(),
+        signOnBonus: 40_000,
+        expectedTenureYears: years,
+      });
+      expect(item.bucket).toBe('taxable');
+    }
   });
 });
 

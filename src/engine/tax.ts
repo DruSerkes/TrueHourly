@@ -13,6 +13,11 @@
  * paycheck estimate, which is why one rate is enough and a bracket engine would
  * be more precise about a question the app isn't asking.
  *
+ * Warnings about the tax assumption — a clamped or raised rate — live in
+ * `warnings.ts` with every other warning; this file owns the arithmetic and
+ * exports `clampRate` for that module to reuse, so the rate the warning quotes
+ * is by construction the rate the gross-up applied.
+ *
  * CLAUDE.md invariant 3: `tax_deferred` must NOT be grossed up like `tax_free`.
  * `tDeferred` defaults to 0 — face value — because an employer 401(k) match is
  * taxed as ordinary income on withdrawal and is illiquid until 59.5. Treating
@@ -21,7 +26,7 @@
 
 import { MAX_TAX_RATE } from './constants.ts';
 import { clamp } from './numbers.ts';
-import type { LineItem, LineItemDraft, TaxBucket, TaxInput, Warning } from './types.ts';
+import type { LineItem, LineItemDraft, TaxBucket, TaxInput } from './types.ts';
 
 /** Everything the gross-up needs, so it accepts a draft or a finished item. */
 type Grossable = Pick<LineItem, 'bucket' | 'annualValue'>;
@@ -72,50 +77,4 @@ export function grossUp(item: Grossable, tax: TaxInput): number {
 /** Finish a draft by applying the gross-up. The only way a `LineItem` is made. */
 export function applyGrossUp(draft: LineItemDraft, tax: TaxInput): LineItem {
   return { ...draft, salaryEquivalent: grossUp(draft, tax) };
-}
-
-/**
- * Warnings about the tax assumption itself.
- *
- * A clamped rate must never be applied silently: the user typed a number and
- * the engine used a different one, and invariant 6 says the app never presents
- * a guess as a fact.
- */
-export function taxWarnings(tax: TaxInput): Warning[] {
-  const warnings: Warning[] = [];
-
-  if (clampRate(tax.combinedMarginalRate) !== tax.combinedMarginalRate) {
-    warnings.push({
-      id: 'tax-rate-clamped',
-      severity: 'caution',
-      message:
-        `Your combined marginal rate was outside the usable range and has been ` +
-        `treated as ${(clampRate(tax.combinedMarginalRate) * 100).toFixed(0)}%. ` +
-        `Rates at or above 100% make the salary-equivalent figure meaningless.`,
-    });
-  }
-
-  if (clampRate(tax.deferredRate) !== tax.deferredRate) {
-    warnings.push({
-      id: 'deferred-rate-clamped',
-      severity: 'caution',
-      message:
-        `Your tax-deferred rate was outside the usable range and has been ` +
-        `treated as ${(clampRate(tax.deferredRate) * 100).toFixed(0)}%.`,
-    });
-  }
-
-  if (clampRate(tax.deferredRate) > 0) {
-    warnings.push({
-      id: 'deferred-rate-raised',
-      severity: 'info',
-      message:
-        `You are grossing up tax-deferred money. Employer 401(k) contributions ` +
-        `escape payroll tax permanently, but they are taxed as ordinary income on ` +
-        `withdrawal and are not accessible without penalty until age 59.5 — so ` +
-        `they are worth less per dollar than a tax-free benefit.`,
-    });
-  }
-
-  return warnings;
 }

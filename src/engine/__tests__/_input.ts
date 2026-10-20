@@ -56,6 +56,7 @@ export function defaultCash(): CashInput {
   return {
     baseSalary: 0,
     bonusTargetPct: 0,
+    bonusTreatment: 'target',
     signOnBonus: 0,
     expectedTenureYears: DEFAULT_VEST_YEARS,
     signOnClawbackMonths: 0,
@@ -110,16 +111,27 @@ export function defaultTax(): TaxInput {
 }
 
 /**
- * Private-equity assumption defaults, exported so session 4's tests don't
- * re-derive them. Unused by session 2's own fixtures.
+ * Private-equity assumption defaults, exported so the equity tests don't
+ * re-derive them.
+ *
+ * `liquidityProbability` is `null` — "derive it" — matching what `src/state/`
+ * will seed a new input with. A test that wants a fixed probability states one
+ * explicitly, which is also what makes the three resolution tiers testable.
  */
 export const PRIVATE_EQUITY_DEFAULTS = {
   commonDiscount: DEFAULT_COMMON_DISCOUNT,
   expectedDilution: DEFAULT_EXPECTED_DILUTION,
   strongMultiple: DEFAULT_STRONG_MULTIPLE,
-  liquidityProbability: DEFAULT_LIQUIDITY_PROBABILITY,
-  esppDiscount: DEFAULT_ESPP_DISCOUNT,
+  liquidityProbability: null,
+  stage: null,
 } as const;
+
+/** The default ESPP discount. Not a private-equity assumption — kept separate
+ * so the bundle above can be spread straight into a `PrivateEquity`. */
+export const ESPP_DISCOUNT_DEFAULT = DEFAULT_ESPP_DISCOUNT;
+
+/** The fallback probability, re-exported so tests assert against one source. */
+export const FALLBACK_LIQUIDITY_PROBABILITY = DEFAULT_LIQUIDITY_PROBABILITY;
 
 /**
  * A full input with every group at its default. Override one group at a time:

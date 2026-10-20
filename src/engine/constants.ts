@@ -19,6 +19,8 @@
  * All money is whole dollars; all rates are decimals.
  */
 
+import type { FundingStage } from './types.ts';
+
 // ===========================================================================
 // § 2026 statutory limits
 // ===========================================================================
@@ -225,6 +227,15 @@ export const WARN_HOURS_PER_WEEK_THRESHOLD = 50;
 /** Weeks in a year. Used to convert day counts into weeks off. */
 export const WEEKS_PER_YEAR = 52;
 
+/**
+ * Share of `totals.faceValue` above which a single `estimated` line item earns
+ * a warning, decimal (DESIGN.md §2.5). ASSUMPTION — a round threshold, not a
+ * statistical finding. The point it encodes: a guess worth 2% of the package is
+ * noise, and a guess worth 30% means the headline is mostly a guess, and the
+ * user is entitled to be told which situation they are in.
+ */
+export const WARN_ESTIMATED_SHARE_THRESHOLD = 0.1;
+
 // --- Perks ----------------------------------------------------------------
 
 /**
@@ -237,6 +248,16 @@ export const DEFAULT_MEAL_VALUE = 15;
 
 /** Default vesting period, years. ASSUMPTION — the common tech grant shape. */
 export const DEFAULT_VEST_YEARS = 4;
+
+/**
+ * Floor on the vesting period used as a divisor, years. ASSUMPTION, and a guard
+ * rather than a grant fact: `grantValue / vestYears` divides by zero at 0, and a
+ * restored save or a half-filled form can hold one. A year is the shortest
+ * window over which "per year" means anything, and it attributes the whole grant
+ * to year one — which is what actually happens when a grant vests immediately.
+ * Mirrors `MIN_TENURE_YEARS` in `cash.ts`.
+ */
+export const MIN_VEST_YEARS = 1;
 
 /**
  * Default common-vs-preferred haircut, decimal. ASSUMPTION. Common stock lacks
@@ -258,11 +279,51 @@ export const DEFAULT_EXPECTED_DILUTION = 0.25;
 export const DEFAULT_STRONG_MULTIPLE = 3;
 
 /**
- * Default probability of any liquidity event, decimal. ASSUMPTION, and the
- * shakiest one in the file — it exists so the expected-value view has a starting
- * point, and it is opt-in for exactly that reason.
+ * Probability of any liquidity event by funding stage at the time of the grant,
+ * decimal.
+ *
+ * SOURCED, not invented — which makes this the one block in the "App defaults"
+ * section that is not purely an assumption. The figures come from a study of
+ * startup exit outcomes by funding stage: later-stage companies have already
+ * survived the filters that kill earlier ones, so the observed exit rate climbs
+ * monotonically.
+ *
+ * Still not a statutory fact, which is why it lives here rather than above:
+ * it is a secondary source summarizing an empirical distribution, the
+ * underlying population is not fully specified, and "exit" is doing some work
+ * (an acqui-hire and a tenfold IPO are both exits, and only one of them makes
+ * an option grant worth anything). Treat it as a better-grounded default than a
+ * round number, not as a prediction about any particular company. Every value
+ * stays user-overridable via `PrivateEquity.liquidityProbability`.
+ *
+ * https://www.zabella.net/blog/startup-exit-statistics
+ * TODO: find the primary dataset behind this summary and cite it directly
  */
-export const DEFAULT_LIQUIDITY_PROBABILITY = 0.3;
+export const LIQUIDITY_PROBABILITY_BY_STAGE: Readonly<Record<FundingStage, number>> = {
+  seed: 0.13,
+  series_a: 0.19,
+  series_b: 0.25,
+  series_c: 0.33,
+  series_d_plus: 0.39,
+};
+
+/**
+ * Fallback probability of a liquidity event when the user has not told us what
+ * stage the company is at, decimal. ASSUMPTION.
+ *
+ * 0.20 rather than the midpoint of the table above, because **most startups
+ * fail.** Earlier-stage companies carry materially higher risk, and the base
+ * rate across all startups sits nearer the bottom of that table than its
+ * middle. With the stage unknown, the defensible default is the conservative
+ * one: it sits between the seed and Series B figures, so it is wrong in a
+ * knowable direction rather than flattering by default.
+ *
+ * This is a statement about startup survival, not about which users answer the
+ * stage question. Overstating the probability makes a worthless grant look like
+ * compensation, which is the error this app exists to correct; understating it
+ * makes the headline a floor, which is the error it can live with.
+ */
+export const DEFAULT_LIQUIDITY_PROBABILITY = 0.2;
 
 // --- ESPP -----------------------------------------------------------------
 

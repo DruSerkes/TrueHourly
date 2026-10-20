@@ -40,21 +40,37 @@ export function baseSalaryItem(cash: CashInput): LineItemDraft {
  * (target %)"). `bonusTargetPct` is a decimal, so 0.10 of a $180,000 base is
  * $18,000.
  *
- * This is a *target*, not a paid amount — a real risk of overstatement, which
- * is why it carries a note rather than being silently folded into base.
+ * `bonusTreatment` changes the row's **confidence, never its value**. A target
+ * is real money if it is hit, but whether it is hit depends on company and
+ * individual performance, so `target` marks the row `estimated` — which makes
+ * it render visually distinct (invariant 6) and makes it eligible for the
+ * 10%-of-total estimate warning in `warnings.ts`. A user whose bonus is
+ * contractual, already declared, or reliably paid in full selects `earned` and
+ * the row is `entered`.
+ *
+ * The engine does not guess which it is. Same reasoning as
+ * `PerksInput.stipendTaxTreatment`: the distinction is real, the app cannot
+ * observe it, and defaulting one way silently would be the app asserting
+ * something it does not know.
  */
 export function bonusItem(cash: CashInput): LineItemDraft {
   const base = nonNegative(cash.baseSalary);
   const pct = nonNegative(cash.bonusTargetPct);
+  const earned = cash.bonusTreatment === 'earned';
 
   return {
     id: 'annual-bonus',
-    label: 'Annual bonus (target)',
+    label: earned ? 'Annual bonus' : 'Annual bonus (target)',
     category: 'cash',
     bucket: 'taxable',
     annualValue: dollars(base * pct),
-    confidence: 'entered',
-    note: 'Target, not guaranteed. Payout usually depends on company and individual performance.',
+    confidence: earned ? 'entered' : 'estimated',
+    note: earned
+      ? 'Counted as money you expect to be paid, on your own assessment of it. If it is ' +
+        'really a performance target, mark it as a target and the headline will treat it as ' +
+        'an estimate.'
+      : 'Target, not guaranteed. Payout usually depends on company and individual performance, ' +
+        'so this is counted as an estimate rather than as pay you can bank on.',
   };
 }
 
@@ -67,10 +83,28 @@ export function bonusItem(cash: CashInput): LineItemDraft {
  * why the resulting number is labelled as amortized in the note — the same
  * bonus is worth twice as much per hour to someone who plans to leave in two
  * years as to someone who plans to stay four.
+ *
+ * ── Why this row is `estimated`, and why it has no treatment flag ───────
+ *
+ * The amortized figure depends on a prediction about the future, so it is
+ * `estimated` whenever the window is longer than a year — which makes it render
+ * visually distinct (invariant 6) and eligible for the 10%-of-total estimate
+ * warning, exactly like a bonus target.
+ *
+ * But the uncertainty is a DIFFERENT KIND from the bonus's, which is why
+ * `bonusTreatment` has no counterpart here. A bonus target may never be paid at
+ * all, and only the user knows how likely that is — so the engine asks. A
+ * sign-on has already been paid in full; what is uncertain is purely the
+ * arithmetic of spreading it, and that uncertainty is a fact about the divisor
+ * rather than a judgment the user could resolve. Adding a flag would be asking
+ * the user to confirm something the engine can already see: if
+ * `expectedTenureYears` is 4, the number is a projection; if it is 1, the whole
+ * bonus is attributed to year one, which is simply what happened.
  */
 export function signOnItem(cash: CashInput): LineItemDraft {
   const bonus = nonNegative(cash.signOnBonus);
   const years = Math.max(nonNegative(cash.expectedTenureYears), MIN_TENURE_YEARS);
+  const amortized = years > MIN_TENURE_YEARS;
 
   return {
     id: 'sign-on-bonus',
@@ -78,8 +112,13 @@ export function signOnItem(cash: CashInput): LineItemDraft {
     category: 'cash',
     bucket: 'taxable',
     annualValue: dollars(bonus / years),
-    confidence: 'entered',
-    note: `One-time payment spread over ${years} year${years === 1 ? '' : 's'} of expected tenure.`,
+    confidence: amortized ? 'estimated' : 'entered',
+    note: amortized
+      ? `One-time payment spread over ${years} years of expected tenure. Counted as an ` +
+        'estimate because that figure is a prediction: leave sooner and this was worth more ' +
+        'per year than shown, stay longer and it was worth less.'
+      : 'One-time payment counted in full against a single year, which is what actually ' +
+        'happens in the year it is paid.',
   };
 }
 

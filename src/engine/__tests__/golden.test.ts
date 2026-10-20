@@ -10,19 +10,15 @@
  * tool like this silently becomes wrong: the number in DESIGN.md was derived
  * independently of the code, which is the only reason it can falsify the code.
  *
- * ── Why parts of this file are skipped ──────────────────────────────────
+ * Session 4 added equity, which was the last missing piece of Fixtures A and B.
+ * Every assertion DESIGN.md §4 states is now live, including both headline
+ * hourly figures to the cent. Sessions 2 and 3 ran with parts of this file
+ * skipped and said so here; that scaffolding is gone because there is nothing
+ * left for it to explain.
  *
- * Fixtures A and B are whole-package figures. As of session 3 the engine
- * computes everything in them except the public RSU grant, so the only
- * assertions still skipped are the ones that need equity:
- *
- *   - session 3 (retirement, health, perks) → ENABLED: the `tax_free` and
- *     `tax_deferred` totals, the meals line, and the whole package minus equity
- *   - session 4 (equity) → still skipped: the RSU contribution and therefore
- *     the headline totals and both hourly figures
- *
- * The inputs below have been complete since session 2, so enabling a block is
- * deleting `.skip` and nothing else.
+ * No expected value in this file was ever edited. Each block was enabled only
+ * once the engine independently produced the figure DESIGN.md §4 derived by
+ * hand — which is the only reason these numbers can falsify the code.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -145,40 +141,15 @@ describe('Fixture A — NYC mid-level, public company, 45h weeks (DESIGN.md §4)
     });
   });
 
-  describe('whole package except equity (enabled: session 3)', () => {
-    // Not a new hand-computed figure: these are DESIGN.md §4's own totals less
-    // the one line the engine cannot produce yet. §4 gives the RSU grant as
-    // $25,000/yr, and it is `taxable`, so it contributes the same $25,000 to
-    // both totals and subtracting it is exact rather than approximate.
-    //
-    // This is the strongest assertion available before session 4: it pins the
-    // sum of twelve line items against an independently derived number, and it
-    // becomes the `whole package` block below the moment equity lands.
-    it('totals $223,635 at face value — $248,635 less the $25,000 RSU line', () => {
-      expect(result.totals.faceValue).toBeCloseTo(248_635 - 25_000, CENTS);
+  describe('whole package (enabled: session 4)', () => {
+    it('values the RSU grant at $25,000 a year', () => {
+      // 1,000 shares x $100 / 4 years. The line DESIGN.md §4 folds into its
+      // 223,000 `taxable` total.
+      const rsu = result.lineItems.find((item) => item.id === 'rsu-vesting');
+      expect(rsu?.annualValue).toBe(25_000);
+      expect(rsu?.bucket).toBe('taxable');
     });
 
-    it('totals $232,310.29 in salary-equivalent dollars', () => {
-      // 257,310.29 - 25,000. The gross-up applies to the 18,435 of tax_free
-      // money only, so removing a taxable line shifts both totals equally.
-      expect(result.totals.salaryEquivalent).toBeCloseTo(257_310.29 - 25_000, CENTS);
-    });
-
-    it('still warns that equity is missing', () => {
-      expect(result.warnings.map((w) => w.id)).toContain('engine-partial');
-    });
-
-    it('emits no clamp warning — nothing in this package hits a statutory limit', () => {
-      // The $1,000 HSA contribution is well inside the self-only limit and the
-      // $7,200 match is nowhere near §415(c). A clamp firing here would mean a
-      // limit is being applied to the wrong quantity.
-      const ids = result.warnings.map((w) => w.id);
-      expect(ids).not.toContain('hsa-contribution-clamped');
-      expect(ids).not.toContain('annual-additions-limit-clamped');
-    });
-  });
-
-  describe.skip('whole package (enable in session 4, once equity lands)', () => {
     it('totals $248,635 at face value', () => {
       // 223,000 taxable + 18,435 tax_free + 7,200 tax_deferred
       expect(result.totals.faceValue).toBeCloseTo(248_635, CENTS);
@@ -198,13 +169,48 @@ describe('Fixture A — NYC mid-level, public company, 45h weeks (DESIGN.md §4)
       // than the extra 5 hours a week cost.
       expect(result.trueHourly.salaryEquivalent).toBeCloseTo(124.85, CENTS);
     });
+
+    it('no longer claims to be a partial engine', () => {
+      // `engine-partial` stood in for equity through sessions 2 and 3. Equity
+      // has landed, so the warning would now be false.
+      expect(result.warnings.map((w) => w.id)).not.toContain('engine-partial');
+    });
+
+    it('emits no clamp warning — nothing in this package hits a statutory limit', () => {
+      // The $1,000 HSA contribution is well inside the self-only limit and the
+      // $7,200 match is nowhere near §415(c). A clamp firing here would mean a
+      // limit is being applied to the wrong quantity.
+      const ids = result.warnings.map((w) => w.id);
+      expect(ids).not.toContain('hsa-contribution-clamped');
+      expect(ids).not.toContain('annual-additions-limit-clamped');
+    });
+
+    it('marks the bonus an estimate but stays under the 10% warning threshold', () => {
+      // §4 gives the bonus as a 10% target, and a target is an estimate — the
+      // user has not said it is money they expect to bank. At $18,000 of a
+      // $248,635 package that is 7.2%, so the §2.5 rule stays quiet. This is
+      // the threshold working on real data rather than on a synthetic fixture:
+      // an estimated row the user should SEE, without an interruption.
+      const bonus = result.lineItems.find((item) => item.id === 'annual-bonus');
+      expect(bonus?.confidence).toBe('estimated');
+      expect(18_000 / 248_635).toBeLessThan(0.1);
+      expect(result.warnings.map((w) => w.id)).not.toContain('large-estimated-line-item');
+    });
+
+    it('carries no equity scenarios — this is a public grant with a real price', () => {
+      expect(result.equityScenarios).toBeUndefined();
+    });
   });
 
-  describe('bucket composition (enabled: session 3)', () => {
+  describe('bucket composition (enabled: session 3, completed: session 4)', () => {
     const sumBucket = (bucket: string): number =>
       result.lineItems
         .filter((item) => item.bucket === bucket)
         .reduce((sum, item) => sum + item.annualValue, 0);
+
+    it('puts $223,000 in taxable: 180,000 base + 18,000 bonus + 25,000 RSUs', () => {
+      expect(sumBucket('taxable')).toBeCloseTo(223_000, CENTS);
+    });
 
     it('puts $18,435 in tax_free: 14,000 premium + 1,000 HSA + 3,435 meals', () => {
       expect(sumBucket('tax_free')).toBeCloseTo(18_435, CENTS);
@@ -245,7 +251,14 @@ describe('Fixture B — same package, 60-hour weeks (DESIGN.md §4)', () => {
     });
   });
 
-  describe.skip('whole package (enable in session 4, once equity lands)', () => {
+  describe('whole package (enabled: session 4)', () => {
+    it('keeps the same numerator as Fixture A', () => {
+      // The comparison B is making only means anything if the package is
+      // identical: same totals, 687 more hours.
+      expect(result.totals.faceValue).toBeCloseTo(248_635, CENTS);
+      expect(result.totals.salaryEquivalent).toBeCloseTo(257_310.29, CENTS);
+    });
+
     it('falls to $90.48/hr at face value', () => {
       expect(result.trueHourly.faceValue).toBeCloseTo(90.48, CENTS);
     });

@@ -23,6 +23,7 @@
 
 import { LIMIT_COMMUTER_MONTHLY, LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE } from './constants.ts';
 import { dollars, nonNegative } from './numbers.ts';
+import { commuterBenefitClamped, tuitionReimbursementClamped } from './warnings.ts';
 import type {
   ContributionSet,
   HoursBreakdown,
@@ -81,16 +82,7 @@ export function computePerksItems(context: PerksContext): ContributionSet {
   const commuterMonthly = nonNegative(perks.commuterBenefitMonthly);
   const commuterClamped = commuterMonthly > LIMIT_COMMUTER_MONTHLY;
   const commuterAllowed = Math.min(commuterMonthly, LIMIT_COMMUTER_MONTHLY);
-  if (commuterClamped) {
-    warnings.push({
-      id: 'commuter-benefit-clamped',
-      severity: 'caution',
-      message:
-        `The qualified transportation exclusion is $${LIMIT_COMMUTER_MONTHLY} a month in 2026, so your ` +
-        'commuter benefit has been capped at that. Anything your employer gives you above the ' +
-        'limit is taxable wages rather than a tax-free benefit.',
-    });
-  }
+  if (commuterClamped) warnings.push(commuterBenefitClamped());
   if (commuterAllowed > 0) {
     items.push({
       id: 'commuter-benefit',
@@ -107,16 +99,7 @@ export function computePerksItems(context: PerksContext): ContributionSet {
   const tuitionEntered = nonNegative(perks.tuitionReimbursement);
   const tuitionClamped = tuitionEntered > LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE;
   const tuitionAllowed = Math.min(tuitionEntered, LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE);
-  if (tuitionClamped) {
-    warnings.push({
-      id: 'tuition-reimbursement-clamped',
-      severity: 'caution',
-      message:
-        `IRC §127 excludes up to $${LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE.toLocaleString('en-US')} of employer education ` +
-        'assistance a year, so the tax-free part has been capped there. The rest is still real ' +
-        'money — it is just taxable wages, so it is not counted as a tax-free benefit here.',
-    });
-  }
+  if (tuitionClamped) warnings.push(tuitionReimbursementClamped());
   if (tuitionAllowed > 0) {
     items.push({
       id: 'tuition-reimbursement',

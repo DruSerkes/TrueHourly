@@ -6,120 +6,49 @@
  * date becomes a field on `CompensationInput`; it is never read ambiently.
  * `__tests__/purity.test.ts` enforces this — fix the engine, not the test.
  *
- * Sessions 2-3 implement hours, cash, the tax gross-up, retirement, health,
- * insurance, perks, and leave. Equity contributes nothing yet and the result
- * says so in a warning rather than quietly reporting a low number as finished.
+ * As of session 4 the engine is feature-complete against DESIGN.md §2: hours,
+ * cash, equity in all four modes, retirement, health, insurance, perks, leave,
+ * the gross-up, the full warning set, and the off-headline notes. The
+ * `engine-partial` warning that stood in for equity is gone — it said something
+ * that is no longer true, and leaving it would be the one kind of inaccuracy
+ * this file cannot afford.
+ *
+ * What this function does, in order, and why the order matters:
+ *
+ *   1. the denominator, because meals and the notes are priced off `daysWorked`
+ *   2. each contributor module, each reporting its own clamps as warnings
+ *   3. the gross-up, in exactly one place (`tax.ts`)
+ *   4. totals, then the cross-cutting warnings that can only be judged once the
+ *      totals exist — the 10%-estimated rule is about a proportion, so it
+ *      cannot run before there is something to take a proportion of
  */
 
 import { computeCashItems } from './cash.ts';
-import { NAIVE_ANNUAL_HOURS, WARN_HOURS_PER_WEEK_THRESHOLD } from './constants.ts';
+import { NAIVE_ANNUAL_HOURS } from './constants.ts';
+import { computeEquityItems } from './equity.ts';
 import { computeHealthItems } from './health.ts';
 import { computeHours } from './hours.ts';
+import { computeNotes } from './notes.ts';
 import { nonNegative } from './numbers.ts';
 import { computePerksItems } from './perks.ts';
 import { computeRetirementItems } from './retirement.ts';
-import { applyGrossUp, taxWarnings } from './tax.ts';
-import type { CompensationInput, LineItem, TrueHourlyResult, Warning } from './types.ts';
-
-/**
- * Warnings that depend on the denominator (DESIGN.md §2.5).
- * Takes the computed breakdown, not the raw input, so a warning can never
- * disagree with the number shown next to it.
- */
-function hoursWarnings(hours: TrueHourlyResult['hours']): Warning[] {
-  const warnings: Warning[] = [];
-
-  if (hours.hoursWorked <= 0) {
-    warnings.push({
-      id: 'no-hours-worked',
-      severity: 'caution',
-      message:
-        'Your time off adds up to the whole year, so there are no hours to divide by. ' +
-        'The hourly figures are shown as $0 rather than as an error.',
-    });
-  }
-
-  if (hours.hoursPerWeek > WARN_HOURS_PER_WEEK_THRESHOLD) {
-    warnings.push({
-      id: 'long-hours',
-      severity: 'caution',
-      message:
-        `At ${hours.hoursPerWeek} hours a week, the headline treats all of those hours ` +
-        'as compensated. If the extra hours are unpaid, your true hourly rate is lower ' +
-        'than the same package would pay at 40 hours.',
-    });
-  }
-
-  if (hours.overridden) {
-    warnings.push({
-      id: 'hours-overridden',
-      severity: 'info',
-      message:
-        `You set annual hours worked directly (${hours.hoursWorked}), so PTO and holidays ` +
-        'are not being used to derive the denominator.',
-    });
-  }
-
-  return warnings;
-}
-
-/** The unlimited-PTO separation note (DESIGN.md §2.1, §2.6). */
-function ptoWarnings(input: CompensationInput): Warning[] {
-  if (input.hours.ptoPlan.type !== 'unlimited') return [];
-
-  return [
-    {
-      id: 'unlimited-pto-no-payout',
-      severity: 'info',
-      message:
-        'Unlimited PTO carries no accrued balance, so there is nothing to pay out when you ' +
-        'leave. An accrual plan with the same days taken is worth more at separation.',
-    },
-  ];
-}
-
-/**
- * Cash-shape warnings (DESIGN.md §2.5).
- *
- * The clawback trigger fires when the clawback OUTLASTS the tenure the user
- * expects — not the other way round. A clawback that expires before the
- * amortization window closes is the benign case: the money goes unconditional
- * early and the only consequence is that the amortized figure is conservative.
- * The risk is a clawback still running at the point the user plans to leave,
- * because then the headline is counting dollars they may have to repay.
- */
-function cashWarnings(input: CompensationInput): Warning[] {
-  const { signOnBonus, signOnClawbackMonths, expectedTenureYears } = input.cash;
-  const amortizationMonths = nonNegative(expectedTenureYears) * 12;
-
-  if (signOnBonus <= 0 || signOnClawbackMonths <= 0) return [];
-  if (signOnClawbackMonths <= amortizationMonths) return [];
-
-  return [
-    {
-      id: 'sign-on-clawback-outlasts-tenure',
-      severity: 'caution',
-      message:
-        `Your sign-on clawback runs for ${signOnClawbackMonths} months, longer than the ` +
-        `${expectedTenureYears} years you expect to stay. If you leave while it is still in ` +
-        'force you would repay some or all of the bonus, so the figures above count money ' +
-        'that is not yet unconditionally yours.',
-    },
-  ];
-}
+import { applyGrossUp } from './tax.ts';
+import { compositionWarnings, inputWarnings } from './warnings.ts';
+import type { CompensationInput, LineItem, TrueHourlyResult } from './types.ts';
 
 export function calculate(input: CompensationInput): TrueHourlyResult {
   const hours = computeHours(input.hours);
 
   // Each contributor module computes its own face values and reports any
-  // statutory clamp it had to apply. Session 4 appends equity here; nothing
-  // downstream of this point needs to change when it does.
+  // statutory clamp or structural risk it is the only one positioned to see.
+  const equity = computeEquityItems(input.equity);
   const retirement = computeRetirementItems(input.retirement, input.cash.baseSalary);
   const health = computeHealthItems(input.health, input.insurance);
   const perks = computePerksItems({ perks: input.perks, leave: input.leave, hours });
 
   const drafts = [
     ...computeCashItems(input.cash),
+    ...equity.items,
     ...retirement.items,
     ...health.items,
     ...perks.items,
@@ -137,7 +66,7 @@ export function calculate(input: CompensationInput): TrueHourlyResult {
 
   // Invariant 4: both headline figures are always computed, and the engine
   // never decides which the UI shows. `hoursWorked` of 0 yields 0, not
-  // Infinity — the warning above explains why (Fixture C).
+  // Infinity — `no-hours-worked` explains why (Fixture C).
   const perHour = (total: number): number =>
     hours.hoursWorked > 0 ? total / hours.hoursWorked : 0;
 
@@ -150,22 +79,19 @@ export function calculate(input: CompensationInput): TrueHourlyResult {
       salaryEquivalent: perHour(totals.salaryEquivalent),
     },
     baseHourlyNaive: nonNegative(input.cash.baseSalary) / NAIVE_ANNUAL_HOURS,
+    // Private equity only. Absent for every other mode, so the UI can key the
+    // scenario panel off its presence (DESIGN.md §3).
+    ...(equity.scenarios === undefined ? {} : { equityScenarios: equity.scenarios }),
     warnings: [
-      ...hoursWarnings(hours),
-      ...cashWarnings(input),
-      ...ptoWarnings(input),
-      ...taxWarnings(input.tax),
+      ...inputWarnings(input, hours),
+      ...equity.warnings,
       ...retirement.warnings,
       ...health.warnings,
       ...perks.warnings,
-      {
-        id: 'engine-partial',
-        severity: 'caution',
-        message:
-          'Equity is not yet included, so if this package has RSUs or options these totals ' +
-          'are low. Everything else — salary, bonus, sign-on, retirement, health, insurance, ' +
-          'perks and leave — is counted.',
-      },
+      ...compositionWarnings(lineItems, totals),
     ],
+    // Off-headline (DESIGN.md §2.6). Deliberately computed AFTER the totals and
+    // never folded into them: a note is a card, not a line item.
+    notes: computeNotes(input, hours),
   };
 }

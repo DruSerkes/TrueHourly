@@ -15,6 +15,7 @@
 
 import { LIMIT_DEFINED_CONTRIBUTION_TOTAL, MAX_ESPP_DISCOUNT } from './constants.ts';
 import { clamp, dollars, nonNegative } from './numbers.ts';
+import { annualAdditionsLimitClamped, matchVestingCliff } from './warnings.ts';
 import type {
   ContributionSet,
   EmployerMatch,
@@ -118,19 +119,16 @@ export function computeRetirementItems(
   const { scaled, clamped } = clampToAnnualAdditionsLimit(employerContributions);
   const [match = 0, profitSharing = 0, studentLoanMatch = 0] = scaled;
 
-  if (clamped) {
-    warnings.push({
-      id: 'annual-additions-limit-clamped',
-      severity: 'caution',
-      message:
-        `Employer retirement contributions came to more than the $${LIMIT_DEFINED_CONTRIBUTION_TOTAL.toLocaleString('en-US')} ` +
-        'IRS annual additions limit for 2026, so they have been scaled back proportionally to fit. ' +
-        'The limit also counts your own 401(k) contributions, which this app does not ask for, ' +
-        'so your real headroom is smaller than this.',
-    });
-  }
+  if (clamped) warnings.push(annualAdditionsLimitClamped());
 
   if (match > 0) items.push(matchItem(match, retirement.employerMatch));
+
+  // DESIGN.md §2.5: a match plus a vesting cliff means the headline is counting
+  // money the user does not own yet. The trigger lives here because this is the
+  // only place that knows the match resolved to a non-zero figure — a 0% match
+  // with a five-year schedule is not worth warning about.
+  const vestingYears = nonNegative(retirement.matchVestingYears);
+  if (match > 0 && vestingYears > 0) warnings.push(matchVestingCliff(match, vestingYears));
 
   if (profitSharing > 0) {
     items.push({
