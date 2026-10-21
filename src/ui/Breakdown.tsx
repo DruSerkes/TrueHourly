@@ -21,6 +21,8 @@
 import type { Category, LineItem } from '../engine/types.ts';
 import { ConfidenceBadge } from './ConfidenceBadge.tsx';
 import { formatDollars } from './format.ts';
+import { valueOf } from './valueMode.ts';
+import type { ValueMode } from './valueMode.ts';
 
 /** Display order. Cash first because it is what the user came in thinking about. */
 const CATEGORY_ORDER: readonly Category[] = [
@@ -42,13 +44,6 @@ const CATEGORY_LABELS: Record<Category, string> = {
   perks: 'Perks & stipends',
   leave: 'Leave',
 };
-
-/** Which of the two totals a row is showing. */
-export type ValueMode = 'faceValue' | 'salaryEquivalent';
-
-function valueOf(item: LineItem, mode: ValueMode): number {
-  return mode === 'faceValue' ? item.annualValue : item.salaryEquivalent;
-}
 
 export interface BreakdownProps {
   lineItems: readonly LineItem[];
@@ -91,45 +86,55 @@ export function Breakdown({ lineItems, mode, total }: BreakdownProps) {
         </div>
       )}
 
+      {/* Each group is `div > dt + dd`, with the category and its subtotal in
+          the `dt` and the itemised rows in the `dd`. The obvious markup — a
+          flex `div` holding `dt` and `dd`, with the row list beside them — is
+          invalid: inside a `<dl>`, a `div` may contain only `dt` and `dd`, and
+          those must be its direct children. Lighthouse flags it, and the reason
+          it matters is that assistive technology pairs terms with definitions
+          structurally, so a malformed list is one that announces its pairs
+          wrongly or not at all. */}
       <dl className="divide-y divide-line">
         {groups.map((group) => (
           <div key={group.category} className="py-2.5 first:pt-0">
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-sm font-semibold text-ink">{CATEGORY_LABELS[group.category]}</dt>
-              <dd className="text-sm font-semibold text-ink tabular-nums">
+            <dt className="flex items-baseline justify-between gap-3 text-sm font-semibold text-ink">
+              <span>{CATEGORY_LABELS[group.category]}</span>
+              <span className="tabular-nums">
                 {formatDollars(group.subtotal)}
                 {total > 0 && (
                   <span className="ml-2 font-normal text-ink-faint">
                     {Math.round((group.subtotal / total) * 100)}%
                   </span>
                 )}
-              </dd>
-            </div>
+              </span>
+            </dt>
 
-            <ul className="mt-1 space-y-1.5">
-              {group.items.map((item) => (
-                <li key={item.id}>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-sm text-ink-muted">
-                      {item.label}
-                      <ConfidenceBadge confidence={item.confidence} />
-                    </span>
-                    <span
-                      className={`shrink-0 text-sm tabular-nums ${
-                        item.confidence === 'entered'
-                          ? 'text-ink-muted'
-                          : 'text-ink-muted italic underline decoration-dashed underline-offset-2'
-                      }`}
-                    >
-                      {formatDollars(valueOf(item, mode))}
-                    </span>
-                  </div>
-                  {item.note !== undefined && (
-                    <p className="mt-0.5 text-xs text-ink-faint">{item.note}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <dd className="m-0">
+              <ul className="mt-1 space-y-1.5">
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm text-ink-muted">
+                        {item.label}
+                        <ConfidenceBadge confidence={item.confidence} />
+                      </span>
+                      <span
+                        className={`shrink-0 text-sm tabular-nums ${
+                          item.confidence === 'entered'
+                            ? 'text-ink-muted'
+                            : 'text-ink-muted italic underline decoration-dashed underline-offset-2'
+                        }`}
+                      >
+                        {formatDollars(valueOf(item, mode))}
+                      </span>
+                    </div>
+                    {item.note !== undefined && (
+                      <p className="mt-0.5 text-xs text-ink-faint">{item.note}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </dd>
           </div>
         ))}
 
@@ -137,7 +142,9 @@ export function Breakdown({ lineItems, mode, total }: BreakdownProps) {
           <dt className="text-sm font-semibold text-ink">
             Total {mode === 'faceValue' ? 'compensation' : 'salary-equivalent'}
           </dt>
-          <dd className="text-base font-semibold text-ink tabular-nums">{formatDollars(total)}</dd>
+          <dd className="m-0 text-base font-semibold text-ink tabular-nums">
+            {formatDollars(total)}
+          </dd>
         </div>
       </dl>
     </div>

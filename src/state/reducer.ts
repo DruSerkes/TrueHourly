@@ -33,6 +33,8 @@
  * the reducer should not have to learn anything about storage to accept it.
  */
 
+import { dollars } from '../engine/numbers.ts';
+import { employerMatchAmount } from '../engine/retirement.ts';
 import { defaultCompensationInput } from './defaults.ts';
 import type {
   CashInput,
@@ -135,4 +137,43 @@ export function withPtoDays(plan: PtoPlan, days: number): PtoPlan {
  */
 export function matchAmountOf(match: EmployerMatch): number {
   return match.type === 'amount' ? match.annualAmount : 0;
+}
+
+/**
+ * The same match, restated as a flat dollar amount.
+ *
+ * Conversion rather than replacement: switching how you *describe* the match is
+ * not a statement that it changed, so a 4%-of-$180,000 match becomes $7,200 and
+ * not $0. `employerMatchAmount` is the engine's own function, so the figure the
+ * field lands on is the figure the engine was already using — the user sees the
+ * number they would have had to work out by hand, and it cannot drift from the
+ * calculation.
+ */
+export function asAmountMatch(match: EmployerMatch, baseSalary: number): EmployerMatch {
+  if (match.type === 'amount') return match;
+  // Rounded to whole dollars, per the storage convention — and because binary
+  // floating point makes 3.5% of $180,000 come out as 6300.000000000001, which
+  // would sit in state and drift a little further on every round trip.
+  return { type: 'amount', annualAmount: dollars(employerMatchAmount(match, baseSalary)) };
+}
+
+/**
+ * The same match, restated as a percentage of base.
+ *
+ * The inverse needs a salary to divide by, and there may not be one yet — the
+ * match field sits above the salary field in some people's filling order. With
+ * no salary the percentage is 0, which is honest: there is no percentage that a
+ * dollar figure implies when the base is unknown, and inventing one would put a
+ * number in the field that the user did not choose.
+ *
+ * The new percentage match is uncapped. A cap cannot survive a trip through the
+ * dollar form — a flat amount has no cap field to hold it — and `null` is the
+ * honest landing point, because the alternative is inventing a ceiling the user
+ * never set. The cap is preserved while the match stays in percentage form,
+ * which is where it is edited.
+ */
+export function asPercentMatch(match: EmployerMatch, baseSalary: number): EmployerMatch {
+  if (match.type === 'percent_of_base') return match;
+  const percentOfBase = baseSalary > 0 ? match.annualAmount / baseSalary : 0;
+  return { type: 'percent_of_base', percentOfBase, capDollars: null };
 }

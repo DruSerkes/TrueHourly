@@ -1115,3 +1115,213 @@ into one "Questions worth asking" card. To be decided after session 6 lands, aga
 the finished product rather than against a half-built one.
 
 **Gates:** typecheck, lint, build clean; **560 tests passing**, none skipped.
+
+---
+
+## 2026-10-20 — Session 6: full inputs, autosave, polish, v1
+
+The last planned session. Everything in `CompensationInput` is now reachable from the
+UI, the input survives a reload, and the app has the explainer and the disclaimer it
+needs to be shown to a stranger.
+
+### 1. A seventh section, which the spec did not ask for
+
+DESIGN.md §6 lists six collapsible sections. `CashInput` has five fields — bonus
+target, bonus treatment, sign-on, expected tenure, clawback window — that belong to
+none of them, and **Fixture A cannot be entered through the UI without the bonus**,
+which made this a correctness problem rather than a tidiness one. The options were to
+scatter cash fields into unrelated sections or to add "Bonus & sign-on". A seventh
+accordion is the smaller deviation. DESIGN.md §6 now lists seven with a footnote.
+
+### 2. The marginal tax rate did not move into the "Tax assumption" section
+
+Both §6 and session 5's brief are right about their own half: §6 calls for a tax
+section, and session 5 put the slider in the result panel. Having both would mean two
+sliders bound to one value, and the second one always looks like the stale copy.
+
+The slider stays where the figure it moves is visible. The section holds the
+**deferred rate**, which the engine has supported since session 2 (`tax.deferredRate`,
+with a `deferredRateRaised` warning already written for it) and which no UI had ever
+exposed. So the section is not a placeholder — it is the first time that control has
+existed.
+
+### 3. The collapsed-section header states its contribution
+
+The brief asked for this and it turned out to carry more weight than expected. The
+figure comes from `result.lineItems` — the engine's output — and never from a second
+calculation over the input, so a header can't disagree with the breakdown beside it.
+Three consequences worth keeping:
+
+- the summary is `null`, rendered as an em dash, when nothing has been entered. `$0`
+  and "untouched" are different states and a header that conflates them is lying;
+- **"Time & leave" summarises in hours, not dollars.** Almost nothing in that section
+  adds money — a sabbatical, unpaid leave and the working pattern all change the
+  denominator (invariant 2), and a dollar figure there would imply otherwise;
+- the equity header reads `$0` with the note "in the headline — see the range" for a
+  private grant, because that is exactly what the engine did.
+
+### 4. Autosave: what the guard checks, and what it deliberately does not
+
+`isSavedInput` verifies the version and that every numeric leaf the engine divides by
+or sums is a finite number. It does **not** range-check, because the engine already
+launders its own inputs (`nonNegative`, `clamp`) and Fixture C is the test that a
+degenerate input cannot produce `NaN` — a second copy of those bounds in the guard
+would be a copy free to diverge.
+
+It also does not check the string-typed enums (`bonusTreatment`, `coverageTier`,
+`stipendTaxTreatment`, `optionClass`, `stage`). Every one is read through an equality
+test in the engine — `=== 'earned'`, `=== 'family'` — so an unrecognized value lands
+on the documented default rather than propagating. A bad *number* is the only thing
+that can reach the arithmetic, which is why numbers are the only thing checked.
+
+Unions are validated per-variant rather than by required-key list: `{ type: 'none' }`
+has no fields at all, and a PTO plan tagged `accrual` carrying `expectedDaysTaken` is
+rejected — the exact shape a patched discriminated union would produce.
+
+### 5. Reset clears the save, and an untouched input is never written
+
+DESIGN.md §5 wires reset to clearing the save. Two things follow that are easy to get
+wrong:
+
+**The clear happens in a dispatch wrapper in `App`, not in the reducer's `reset`
+case.** A reducer must be a pure function of its arguments; React invokes reducers
+twice in development specifically to surface side effects hiding in them.
+
+**`saveInput` removes the key instead of writing when the input equals the defaults.**
+Without this, reset cleared the save and the 500ms debounced autosave then wrote the
+fresh defaults back 500ms later — so the footer's "Reset to defaults erases the saved
+copy" would have been false half a second after it was true. Verified in the browser:
+nothing in storage after a reset, before or after the debounce.
+
+### 6. The Content-Security-Policy is how invariant 7 stops being a promise
+
+`public/_headers` ships `connect-src 'none'`. Invariant 7 — no salary data leaves the
+browser — is currently enforced by the fact that nobody has written a `fetch`. That
+holds until someone adds an analytics snippet in good faith. With the header, the
+browser refuses the request, and re-enabling network access means editing a line whose
+comment says why it is there. For an app whose front page makes a privacy claim, the
+claim should be enforced by something other than everyone's continued good intentions.
+
+### 7. Two accessibility defects found by measurement, not by reading
+
+Both were pre-existing and neither was visible:
+
+- **The breakdown's `<dl>` was malformed.** A `div` inside a `<dl>` may contain only
+  `dt` and `dd` as direct children; ours wrapped them in a second flex `div` and put a
+  `<ul>` of rows alongside. Assistive technology pairs terms with definitions
+  structurally, so a malformed list announces its pairs wrongly. Restructured so each
+  group is `div > dt + dd`, with the itemised rows inside the `dd`. Lighthouse
+  accessibility went 91 → **100**.
+- **The explainer's headings jumped `h1` → `h3`.** Fixed by putting the heading inside
+  the `<summary>`, which is also the pattern that makes a disclosure navigable by
+  heading.
+
+### 8. What was verified, and how
+
+Reported in full in the session summary. In short: all 587 tests green; Fixture A
+typed into the live UI gives **$120.64 / $124.85 / $86.54, $248,635 / $257,310, 2,061
+hours** — exact; autosave round-trips every field through a reload; a bumped
+`STORAGE_VERSION` loads clean defaults with no console error; the whole form is
+keyboard-operable including the radio group, the disclosures and the slider;
+Lighthouse accessibility **100**; axe-core **0 violations** on the fully-populated page
+with every section open; no horizontal scroll at 360px; contrast passes AA in both
+themes by measurement.
+
+**Not done: the deploy.** `wrangler` needs an interactive `wrangler login` against the
+owner's Cloudflare account, which is not something this session can or should do on
+someone's behalf. Everything else is ready: `pnpm deploy`, the settings table in the
+README, and `public/_headers`.
+
+### Queued for v2 (DESIGN.md §8 stands, with these additions)
+
+- **Compare two offers.** Still the reason the input is one serializable object.
+- **Shareable URL-fragment links** — and the point at which a runtime validation
+  library (Zod) earns its place, because a pasted URL is untrusted input in a way a
+  same-origin `localStorage` blob is not.
+- **The note cards.** Still deferred by request: whether the three unconditional cards
+  collapse into one "Questions worth asking". Now decidable against a finished product.
+- An `aria-live` announcement when a section's contribution changes while collapsed.
+- Component tests. There are none — this session's UI was verified by hand in a
+  browser, which found real defects but does not run in CI.
+
+**Gates:** typecheck, lint, build clean; **587 tests passing**, none skipped.
+
+---
+
+## 2026-10-20 — Session 6 follow-up: the match takes a percentage on the field itself
+
+Both forms of the employer 401(k) match were supported from the start, but the
+percentage form was only reachable from the collapsed "Retirement & savings" section
+while the always-visible field took dollars only. That is backwards: **"4% of salary"
+is how plan documents state a match**, so the form that requires no arithmetic was the
+one hidden behind a disclosure, and the visible field was the one demanding the user
+multiply by their own salary.
+
+`MatchField` now puts a `$ / year` ↔ `% of base` switch on the field, and shows the
+derived figure live underneath — `= $6,300 a year on a $180,000 salary`. Changing the
+salary moves it, which is the entire reason to hold a match as a percentage rather
+than as a frozen dollar amount.
+
+**The section no longer offers a second copy of the control.** Same rule as the tax
+slider in item 2 of the session 6 entry: two controls bound to one value is how a form
+starts contradicting itself. The section keeps the cap — which only a percentage match
+can have — and the vesting, and states the current figure with a pointer upward.
+
+### Conversions, not resets
+
+Switching units runs `asAmountMatch` / `asPercentMatch` (in `state/reducer.ts`, tested
+in `reducer.test.ts`). Three judgments in those:
+
+- **The dollar figure comes from the engine's own `employerMatchAmount`**, so the
+  number that lands in the field is the number the calculation was already using, cap
+  included. A second implementation here would be free to disagree with the breakdown
+  sitting beside it.
+- **It is rounded with `dollars()`.** 3.5% of $180,000 is `6300.000000000001` in binary
+  floating point, and that would sit in state and drift further on every round trip.
+- **No salary yet means 0%, not a guess.** No percentage is implied by a dollar figure
+  over an unknown base, and the match field sits above the salary field in some
+  people's filling order.
+
+A cap cannot survive a trip through the dollar form, because a flat amount has no
+field to hold one. It is dropped rather than re-invented on the way back.
+
+### The cap in the match note is now grouped
+
+The engine's note for a capped percentage match used to read `capped at $5000.`. It now
+reads `$5,000`, using `.toLocaleString('en-US')` the way `equity.ts` already writes its
+notes, with the matching assertion in `retirement.test.ts` updated from `'5000'` to
+`'5,000'`. Display text only — no calculation changed, and the purity test still
+passes. Applied on the owner's approval, since engine changes are their call.
+
+**Gates:** typecheck, lint, build clean; **594 tests passing**, none skipped.
+
+---
+
+## 2026-10-21 — The employer money moved into its own sections
+
+The 401(k) match and the employer health premium left the always-visible block for
+"Retirement & savings" and "Health & insurance" respectively, at the owner's request.
+The always-visible form is now four fields: base salary, hours per week, PTO,
+holidays — the fraction itself, nothing else.
+
+The argument for the move is that each figure now sits beside the settings that
+qualify it. A match entered above the fold and capped inside a collapsed section is a
+match that can be read wrong, and the same goes for a premium whose coverage tier —
+which sets the HSA limit it is checked against — lived somewhere else. Both are the
+first field in their section, because both are the largest number in it.
+
+**The cost, stated plainly because it is real:** those two are usually the biggest
+employer-paid figures in a package, and a first-time visitor now sees a salary-only
+result until they open something. The whole product thesis is that employer benefits
+are the missing quarter, so burying them is not free. Three things carry the weight
+instead — the intro line under "Your package" names them and says they are worth about
+a quarter of a package, every section header states its own current contribution so
+the money is legible while collapsed, and the empty result panel points at the
+sections explicitly. If the finished product turns out to under-report because of
+this, the fix is to lift the two fields back out, not to add a third copy of them.
+
+DESIGN.md §6's always-visible bullet was rewritten to match, with a footnote, rather
+than leaving the spec describing a page that no longer exists.
+
+**Gates:** typecheck, lint, build clean; **594 tests passing**. Fixture A re-verified
+through the moved fields: **$120.64**, 2,061 hours, $248,635. axe-core: 0 violations.

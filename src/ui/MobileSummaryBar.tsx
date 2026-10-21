@@ -20,9 +20,16 @@ export interface MobileSummaryBarProps {
   /** Dollars per hour, naive. Shown struck through as the thing being corrected. */
   naive: number;
   modeLabel: string;
+  /** True before anything has been entered; the bar prompts instead of claiming $0.00. */
+  empty?: boolean;
 }
 
-export function MobileSummaryBar({ hourly, naive, modeLabel }: MobileSummaryBarProps) {
+export function MobileSummaryBar({
+  hourly,
+  naive,
+  modeLabel,
+  empty = false,
+}: MobileSummaryBarProps) {
   return (
     <div
       aria-hidden="true"
@@ -30,10 +37,16 @@ export function MobileSummaryBar({ hourly, naive, modeLabel }: MobileSummaryBarP
     >
       <div className="mx-auto flex max-w-5xl items-baseline justify-between gap-3">
         <span className="text-xs text-ink-faint">
-          <span className="line-through tabular-nums">{formatHourly(naive)}</span> → {modeLabel}
+          {empty ? (
+            'Enter a salary to see your rate'
+          ) : (
+            <>
+              <span className="line-through tabular-nums">{formatHourly(naive)}</span> → {modeLabel}
+            </>
+          )}
         </span>
         <span className="text-2xl font-bold text-accent tabular-nums">
-          {formatHourly(hourly)}
+          {empty ? <span className="text-ink-faint">&mdash;</span> : formatHourly(hourly)}
           <span className="ml-1 text-sm font-normal text-ink-muted">/ hr</span>
         </span>
       </div>

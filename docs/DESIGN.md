@@ -457,16 +457,31 @@ not just an implementation detail.
 
 Single page, progressive disclosure, live result.
 
-- **Always visible:** base salary, hours/week, PTO + holidays, 401(k) match, employer health
-  premium. Five inputs get you a meaningful number.
-- **Collapsible sections:** Equity, Retirement & savings, Health & insurance, Time & leave,
-  Perks & stipends, Tax assumption.
+- **Always visible:** base salary, hours/week, PTO + holidays — the fraction itself³.
+- **Collapsible sections:** Bonus & sign-on², Equity, Retirement & savings, Health & insurance,
+  Time & leave, Perks & stipends, Tax assumption. Collapsed by default, each header stating its
+  own current contribution so a closed section is never a black box.
 - **Result panel** (static on desktop, pinned bottom on mobile¹): the big number, the naive
   anchor struck through above it, a face-value ↔ salary-equivalent toggle, a stacked
   contribution breakdown, warnings, and the off-headline cards.
 - Estimated values render visually distinct from entered ones.
 - Every input has a plain-language "why this matters" affordance. The explanations _are_ the
   product for a first-time visitor.
+
+³ The 401(k) match and the employer health premium were specified here too, and were moved
+into "Retirement & savings" and "Health & insurance" after using the built page: each one
+belongs beside the settings that qualify it (the match beside its cap and vesting, the premium
+beside the HSA money and the coverage tier that limits it), rather than across a disclosure
+boundary from them. The known cost is that the two largest employer-paid figures are now one
+click away on a first visit; what offsets it is that every section header states its own
+contribution. See DECISIONS.md, 2026-10-21.
+
+² "Bonus & sign-on" was not in the original list of six, and the five `CashInput` fields it
+holds — bonus target, bonus treatment, sign-on, expected tenure, clawback — belonged to no
+listed section. Fixture A cannot be reproduced in the UI without the bonus, so they needed a
+home; a seventh section was a smaller deviation than scattering them. The marginal tax rate
+stays in the result panel beside the figure it moves, and the "Tax assumption" section holds
+the advanced deferred rate. See DECISIONS.md, 2026-10-20 session 6.
 
 ¹ Sticky on desktop was specified here and built in session 5, then removed after
 using it: the pinned card hangs over the breakdown you are scrolling to read, and

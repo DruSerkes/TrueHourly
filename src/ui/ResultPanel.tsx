@@ -28,7 +28,7 @@ import {
 import type { CompensationInput, TrueHourlyResult } from '../engine/types.ts';
 import type { InputAction } from '../state/reducer.ts';
 import { Breakdown } from './Breakdown.tsx';
-import type { ValueMode } from './Breakdown.tsx';
+import type { ValueMode } from './valueMode.ts';
 import { NoteCards } from './NoteCards.tsx';
 import { WarningList } from './WarningList.tsx';
 import { RateField } from './fields/RateField.tsx';
@@ -65,6 +65,12 @@ const MODE_BLURBS: Record<ValueMode, string> = {
 export function ResultPanel({ input, result, dispatch, mode, onModeChange }: ResultPanelProps) {
   const hourly = result.trueHourly[mode];
   const total = result.totals[mode];
+  // Nothing entered yet. Distinguished from a real zero because the panel has
+  // to say something other than `$0.00 / hour`, which reads as a finding rather
+  // than as an empty form — and because `salary ÷ 2,080` is also $0.00 here, so
+  // the struck-through anchor above it would be two zeroes correcting each
+  // other. A first visit gets the instruction instead of the arithmetic.
+  const empty = result.totals.faceValue === 0;
   const weeksWorked =
     result.hours.hoursPerWeek > 0 ? result.hours.hoursWorked / result.hours.hoursPerWeek : 0;
 
@@ -89,21 +95,43 @@ export function ResultPanel({ input, result, dispatch, mode, onModeChange }: Res
       </p>
 
       <div className={CARD}>
-        <p className="text-sm text-ink-muted">
-          You probably think you earn{' '}
-          <span className="line-through decoration-2 tabular-nums">
-            {formatHourly(result.baseHourlyNaive)}
-          </span>{' '}
-          an hour
-          <span className="text-ink-faint"> — base salary ÷ {formatCount(NAIVE_ANNUAL_HOURS)}</span>
-        </p>
+        {empty ? (
+          <>
+            <p className="text-sm text-ink-muted">Your true hourly rate</p>
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="text-5xl font-bold tracking-tight text-ink-faint tabular-nums">
+                &mdash;
+              </span>
+              <span className="text-base text-ink-muted">/ hour</span>
+            </p>
+            <p className="mt-2 text-sm text-ink-muted">
+              Enter your base salary to start. Everything else is optional, and the sections below
+              are where the number usually moves the most &mdash; employer-paid benefits are worth a
+              quarter of a package and appear on no payslip.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-ink-muted">
+              You probably think you earn{' '}
+              <span className="line-through decoration-2 tabular-nums">
+                {formatHourly(result.baseHourlyNaive)}
+              </span>{' '}
+              an hour
+              <span className="text-ink-faint">
+                {' '}
+                &mdash; base salary ÷ {formatCount(NAIVE_ANNUAL_HOURS)}
+              </span>
+            </p>
 
-        <p className="mt-1 flex items-baseline gap-2">
-          <span className="text-5xl font-bold tracking-tight text-accent tabular-nums">
-            {formatHourly(hourly)}
-          </span>
-          <span className="text-base text-ink-muted">/ hour</span>
-        </p>
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="text-5xl font-bold tracking-tight text-accent tabular-nums">
+                {formatHourly(hourly)}
+              </span>
+              <span className="text-base text-ink-muted">/ hour</span>
+            </p>
+          </>
+        )}
 
         <fieldset className="mt-3">
           <legend className="text-xs font-medium tracking-wide text-ink-faint uppercase">

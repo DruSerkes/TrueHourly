@@ -89,7 +89,9 @@ function matchItem(annualValue: number, match: EmployerMatch): LineItemDraft {
   const note =
     match.type === 'percent_of_base'
       ? `${(nonNegative(match.percentOfBase) * 100).toFixed(2).replace(/\.?0+$/, '')}% of base` +
-        (match.capDollars === null ? '.' : `, capped at $${dollars(match.capDollars)}.`)
+        (match.capDollars === null
+          ? '.'
+          : `, capped at $${dollars(match.capDollars).toLocaleString('en-US')}.`)
       : undefined;
 
   return {

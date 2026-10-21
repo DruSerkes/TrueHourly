@@ -11,7 +11,7 @@
  * convenient path and the text box is the exact one, both bound to the same
  * state — not a fallback, an equal.
  *
- * The slider works in PERCENT (0–60, step 1) and converts once on the way out.
+ * The slider works in PERCENT (0 to `max`, step 1) and converts once on the way out.
  * A range input stepping in 0.01 decimals reports `aria-valuenow="0.32"` to a
  * screen reader, which reads as "nought point three two" — true, and useless.
  * Integers plus an explicit `aria-valuetext` of `32%` is what a listener can
@@ -37,11 +37,25 @@ export interface RateFieldProps {
   onChange: (rate: number) => void;
   /** Preset decimals offered as one-click buttons. */
   presets?: readonly number[];
+  /**
+   * Ceiling as a decimal. Defaults to `MAX_TAX_RATE`, which is what this field
+   * was built for; the equity haircuts and the liquidity probability pass `1`,
+   * where every value up to certainty is meaningful.
+   */
+  max?: number;
 }
 
-const MAX_PCT = Math.round(MAX_TAX_RATE * 100);
-
-export function RateField({ id, label, help, why, value, onChange, presets = [] }: RateFieldProps) {
+export function RateField({
+  id,
+  label,
+  help,
+  why,
+  value,
+  onChange,
+  presets = [],
+  max = MAX_TAX_RATE,
+}: RateFieldProps) {
+  const maxPct = Math.round(max * 100);
   const [draft, setDraft] = useState<string | null>(null);
   const valuePct = Math.round(value * 1000) / 10;
   const text = draft ?? String(valuePct);
@@ -50,7 +64,7 @@ export function RateField({ id, label, help, why, value, onChange, presets = [] 
   const textId = `${id}-text`;
 
   function commitPct(pct: number): void {
-    onChange(Math.min(Math.max(pct, 0), MAX_TAX_RATE * 100) / 100);
+    onChange(Math.min(Math.max(pct, 0), maxPct) / 100);
   }
 
   return (
@@ -64,7 +78,7 @@ export function RateField({ id, label, help, why, value, onChange, presets = [] 
           id={id}
           type="range"
           min={0}
-          max={MAX_PCT}
+          max={maxPct}
           step={1}
           value={Math.round(valuePct)}
           className="h-6 w-full"

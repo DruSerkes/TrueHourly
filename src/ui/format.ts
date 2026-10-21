@@ -33,6 +33,15 @@ const COUNT = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const ONE_DECIMAL = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
 
 /**
+ * Grouped, up to two decimals, no trailing zeros: `4.5`, `1,200`, `0.08`.
+ *
+ * For the per-share figures. `COUNT` would render a $4.50 strike price as `5`
+ * and a $0.08 one as `0`, which in a field the user is about to type over is
+ * not a rounding choice — it is the field silently changing their input.
+ */
+const PER_SHARE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+
+/**
  * Guard for every formatter below.
  *
  * The engine launders its inputs and should never hand out a `NaN`
@@ -88,4 +97,23 @@ export function formatFieldValue(value: number): string {
   if (!Number.isFinite(value)) return '';
   if (value === 0) return '';
   return COUNT.format(value);
+}
+
+/**
+ * The same, for a field whose value is genuinely fractional — a share price, a
+ * strike, a per-day meal value.
+ *
+ * Separate from `formatFieldValue` rather than a parameter on it, because the
+ * choice is a property of the quantity and not of the call site: an annual
+ * salary should never render cents and a strike price must never not.
+ */
+export function formatPreciseFieldValue(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  if (value === 0) return '';
+  return PER_SHARE.format(value);
+}
+
+/** Dollars with cents only when it has them: `$4.50`, `$1,200`. */
+export function formatPerShare(value: number): string {
+  return finiteOr(value, '—') ?? `$${PER_SHARE.format(value)}`;
 }

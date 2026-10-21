@@ -1,16 +1,29 @@
 /**
- * The six always-visible inputs (DESIGN.md §6): base salary, hours per week,
- * PTO, holidays, the 401(k) match, and the employer health premium.
+ * The four always-visible inputs: base salary, hours per week, PTO, holidays.
  *
- * Six is not an arbitrary cut. They are the fields that between them move the
- * answer most: two set the denominator, two set the time off that shrinks it,
- * and two are the employer money a naive hourly rate ignores entirely. A user
- * who fills in only these gets a number worth looking at, which is the test for
- * whether a field belongs above the fold.
+ * They are the fraction itself — the salary on top, and the three fields that
+ * decide the hours underneath. Between them they produce the one comparison
+ * this app exists to make, so they are the fields that do not require opening
+ * anything.
  *
- * The remaining ~20 inputs get collapsible sections in session 6. They are
- * deliberately absent here rather than crammed in flat: a form of 26 fields is
- * a form nobody finishes.
+ * ── Why the employer money moved below ──────────────────────────────────
+ *
+ * DESIGN.md §6 originally kept the 401(k) match and the employer health
+ * premium up here too. They now live with the rest of their own settings — the
+ * match beside its cap and vesting in "Retirement & savings", the premium
+ * beside the HSA and FSA money in "Health & insurance" — which means each
+ * number sits next to the controls that qualify it rather than across a
+ * disclosure boundary from them.
+ *
+ * The cost is real and worth stating: those two are usually the largest
+ * employer-paid figures in a package, and a first-time visitor now sees a
+ * salary-only result until they open a section. What answers it is that each
+ * section header states its own contribution, so the employer money is
+ * legible without opening anything, and the empty result panel points at the
+ * sections explicitly.
+ *
+ * The remaining inputs live in those collapsible sections rather than being
+ * crammed in flat here: a form of 26 fields is a form nobody finishes.
  *
  * Every field carries a "why this matters" disclosure. DESIGN.md §6 is blunt
  * about this — for a first-time visitor the explanations ARE the product. The
@@ -31,8 +44,7 @@ export interface CoreInputsProps {
 }
 
 export function CoreInputs({ input, dispatch }: CoreInputsProps) {
-  const { hours, cash, retirement, health } = input;
-  const match = retirement.employerMatch;
+  const { hours, cash } = input;
 
   return (
     <section aria-labelledby="your-package">
@@ -40,7 +52,9 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
         Your package
       </h2>
       <p className="mt-1 text-sm text-ink-muted">
-        Six fields get you a real number. Everything is optional and nothing leaves this browser.
+        Four fields get you a number. The employer-paid money — your 401(k) match, health premium,
+        equity, perks — is in the sections below, and it is usually worth a quarter of a package.
+        Nothing leaves this browser.
       </p>
 
       <div className={`${CARD} mt-3 divide-y divide-line`}>
@@ -98,43 +112,17 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
           value={hours.holidayDays}
           onChange={(holidayDays) => dispatch({ type: 'patchHours', patch: { holidayDays } })}
         />
-
-        <CurrencyField
-          id="employer-match"
-          label="Employer 401(k) match"
-          help="Dollars per year your employer puts in. Not your own contribution."
-          why="Free money, but not the same kind of money as salary: you cannot spend it until
-               59½ and it is taxed as ordinary income when you do. So this app counts it at
-               face value and deliberately does not treat it as tax-free — inflating it would
-               be the sort of error that discredits the whole number."
-          value={match.type === 'amount' ? match.annualAmount : 0}
-          onChange={(annualAmount) =>
-            dispatch({ type: 'setEmployerMatch', employerMatch: { type: 'amount', annualAmount } })
-          }
-        />
-
-        <CurrencyField
-          id="employer-health-premium"
-          label="Employer health premium"
-          help="The employer's share of medical, dental and vision premiums, per year. Not the
-                part deducted from your paycheck."
-          why="This is usually the largest number on the page that nobody counts. It is money
-               spent on you that never appears on a payslip, and because it is excluded from
-               income it is worth MORE than the same amount of salary — a $14,000 premium is
-               worth about $20,600 of pay at a 32% marginal rate. Ask HR for the figure; it is
-               on the benefits summary."
-          value={health.employerPremiumContribution}
-          onChange={(employerPremiumContribution) =>
-            dispatch({ type: 'patchHealth', patch: { employerPremiumContribution } })
-          }
-        />
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm text-ink-muted">
-          Equity, perks, stipends and leave are coming in the next release.
+          Benefits, equity, perks and leave are in the sections below.
         </p>
-        <button type="button" className={BUTTON} onClick={() => dispatch({ type: 'reset' })}>
+        <button
+          type="button"
+          className={`${BUTTON} shrink-0`}
+          onClick={() => dispatch({ type: 'reset' })}
+        >
           Reset to defaults
         </button>
       </div>

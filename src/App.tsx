@@ -1,7 +1,8 @@
 /**
  * The page.
  *
- * Three things only: hold the input, run the engine, lay out the two halves.
+ * Four things: hold the input, run the engine, lay out the two halves, and keep
+ * the input in `localStorage` so a returning visitor does not retype it.
  *
  * `calculate` is called on every render rather than memoized. It is pure, it
  * touches a few dozen numbers, and it runs in well under a millisecond — a
@@ -28,24 +29,63 @@
  * field you are typing into — which is the job sticky would have been doing.
  * On mobile the form and the result cannot share the screen, so there the
  * pinned bar stays and genuinely earns it.
+ *
+ * ── Why `reset` clears the save here and not in the reducer ─────────────
+ *
+ * DESIGN.md §5 wires reset-to-defaults to clearing the save, and the obvious
+ * place to put that is the `reset` case of the reducer. It must not go there: a
+ * reducer has to be a pure function of its arguments, and React invokes
+ * reducers twice in development precisely to surface side effects hiding in
+ * them. So the clear happens in this wrapper, which is a place a side effect is
+ * allowed to live.
  */
 
-import { useReducer, useState } from 'react';
+import { useCallback, useReducer, useState } from 'react';
 import { calculate } from './engine/calculate.ts';
 import { defaultCompensationInput } from './state/defaults.ts';
 import { inputReducer } from './state/reducer.ts';
+import type { InputAction } from './state/reducer.ts';
+import { clearSavedInput, loadSavedInput } from './state/storage.ts';
+import { useAutosave } from './state/useAutosave.ts';
+import type { CompensationInput } from './engine/types.ts';
 import { CoreInputs } from './ui/CoreInputs.tsx';
+import { Footer } from './ui/Footer.tsx';
+import { HowThisWorks } from './ui/HowThisWorks.tsx';
+import { InputSections } from './ui/InputSections.tsx';
 import { MobileSummaryBar } from './ui/MobileSummaryBar.tsx';
 import { ResultPanel } from './ui/ResultPanel.tsx';
-import type { ValueMode } from './ui/Breakdown.tsx';
+import type { ValueMode } from './ui/valueMode.ts';
+
+/**
+ * Read the save once, and remember whether there was one.
+ *
+ * Both facts come from a single read so they cannot disagree, and it happens in
+ * a `useState` initializer so it runs once per mount rather than on every
+ * render.
+ */
+function initialState(): { input: CompensationInput; restored: boolean } {
+  const saved = loadSavedInput();
+  return { input: saved ?? defaultCompensationInput(), restored: saved !== null };
+}
 
 export default function App() {
-  const [input, dispatch] = useReducer(inputReducer, undefined, defaultCompensationInput);
+  const [{ input: initialInput, restored }] = useState(initialState);
+  const [input, rawDispatch] = useReducer(inputReducer, initialInput);
   const [mode, setMode] = useState<ValueMode>('faceValue');
   const result = calculate(input);
 
+  useAutosave(input);
+
+  const dispatch = useCallback((action: InputAction) => {
+    // Clearing before dispatching, not after: the autosave debounce is 500ms,
+    // so the write of the fresh defaults lands well after this, and a clear
+    // that ran afterwards would be racing it.
+    if (action.type === 'reset') clearSavedInput();
+    rawDispatch(action);
+  }, []);
+
   return (
-    <div className="min-h-dvh">
+    <div className="flex min-h-dvh flex-col">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto max-w-5xl px-4 py-5">
           <h1 className="text-2xl font-bold tracking-tight text-ink">True Hourly</h1>
@@ -54,18 +94,23 @@ export default function App() {
             work are both in the arithmetic.
           </p>
           <p className="mt-2 text-xs text-ink-faint">
-            Everything runs in your browser. No account, no server, no analytics on what you type —
-            your salary never leaves this page.
+            Everything runs in your browser. Your inputs are saved in this browser only and are
+            never sent anywhere — there is no server to send them to.
+            {restored && ' Numbers below were restored from your last visit.'}
           </p>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 pb-24 lg:grid-cols-12 lg:pb-6">
-        <div className="lg:col-span-6">
-          <CoreInputs input={input} dispatch={dispatch} />
+      <main className="mx-auto grid w-full max-w-5xl grow gap-6 px-4 py-6 pb-28 lg:grid-cols-12 lg:pb-6">
+        <div className="min-w-0 lg:col-span-6">
+          <HowThisWorks />
+          <div className="mt-6">
+            <CoreInputs input={input} dispatch={dispatch} />
+          </div>
+          <InputSections input={input} result={result} dispatch={dispatch} mode={mode} />
         </div>
 
-        <div className="lg:col-span-6">
+        <div className="min-w-0 lg:col-span-6">
           <ResultPanel
             input={input}
             result={result}
@@ -76,10 +121,13 @@ export default function App() {
         </div>
       </main>
 
+      <Footer />
+
       <MobileSummaryBar
         hourly={result.trueHourly[mode]}
         naive={result.baseHourlyNaive}
         modeLabel={mode === 'faceValue' ? 'face value' : 'salary-equivalent'}
+        empty={result.totals.faceValue === 0}
       />
     </div>
   );

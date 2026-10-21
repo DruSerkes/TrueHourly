@@ -113,7 +113,7 @@ describe('401(k) employer match', () => {
       180_000
     );
     expect(find(pct, 'employer-401k-match')?.note).toContain('4%');
-    expect(find(pct, 'employer-401k-match')?.note).toContain('5000');
+    expect(find(pct, 'employer-401k-match')?.note).toContain('5,000');
   });
 
   it('omits the row entirely at $0', () => {

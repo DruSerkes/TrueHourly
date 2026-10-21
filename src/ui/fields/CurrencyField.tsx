@@ -23,7 +23,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { formatFieldValue } from '../format.ts';
+import { formatFieldValue, formatPreciseFieldValue } from '../format.ts';
 import { parseNumeric } from '../parseNumber.ts';
 import { helpId } from '../ids.ts';
 import { INPUT, INPUT_INVALID } from '../styles.ts';
@@ -37,11 +37,26 @@ export interface CurrencyFieldProps {
   /** Whole dollars per year. */
   value: number;
   onChange: (value: number) => void;
+  /**
+   * Show the value to two decimals. For the quantities that genuinely are
+   * fractional — a share price, a strike, a per-day meal value — where whole
+   * dollars would render `$4.50` as `5` in a field the user is about to edit.
+   */
+  precise?: boolean;
 }
 
-export function CurrencyField({ id, label, help, why, value, onChange }: CurrencyFieldProps) {
+export function CurrencyField({
+  id,
+  label,
+  help,
+  why,
+  value,
+  onChange,
+  precise = false,
+}: CurrencyFieldProps) {
+  const format = precise ? formatPreciseFieldValue : formatFieldValue;
   const [draft, setDraft] = useState<string | null>(null);
-  const text = draft ?? formatFieldValue(value);
+  const text = draft ?? format(value);
   const parsed = draft === null ? value : parseNumeric(draft);
   const invalid = parsed === null;
 
@@ -76,7 +91,7 @@ export function CurrencyField({ id, label, help, why, value, onChange }: Currenc
           aria-describedby={help === undefined ? undefined : helpId(id)}
           aria-invalid={invalid || undefined}
           onChange={(event) => handleChange(event.target.value)}
-          onFocus={() => setDraft(formatFieldValue(value))}
+          onFocus={() => setDraft(format(value))}
           onBlur={() => setDraft(null)}
         />
       </div>
