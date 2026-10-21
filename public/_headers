@@ -1,0 +1,22 @@
+# Cloudflare Pages response headers.
+#
+# The Content-Security-Policy is here because invariant 7 — "no salary data
+# leaves the browser" — is a promise this app makes on its own front page, and a
+# promise enforced only by code review is a promise that lasts until somebody
+# adds an analytics snippet. `connect-src 'none'` means the browser itself will
+# refuse any fetch, XHR, WebSocket or beacon this page attempts, so the claim
+# holds even if a future change tries to break it. If a legitimate network call
+# is ever needed, this line has to be edited deliberately, which is the point.
+#
+# `style-src` allows inline styles: the contribution bar sets its own widths
+# from calculated percentages, which is an inline `style` attribute.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
