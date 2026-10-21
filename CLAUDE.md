@@ -89,7 +89,9 @@ to servers. `localStorage` is wrapped in try/catch and the app works without it.
 - **Vite + React 19 + TypeScript** (strict). SPA, no router needed for v1.
 - **Vitest** for unit tests. The engine target is meaningful coverage of every line-item path.
 - **Tailwind** for styling.
-- Deployed to **Cloudflare Pages**: build `npm run build`, output `dist`.
+- Package manager is **pnpm** (`packageManager` is pinned in package.json). Use `pnpm`,
+  not `npm` — pnpm's build-script approvals live in `pnpm-workspace.yaml` and npm ignores them.
+- Deployed to **Cloudflare Pages**: build `pnpm build`, output `dist`.
 
 No state library. `useReducer` over a single `CompensationInput` is sufficient and keeps the
 input object trivially serializable — which is the whole point of the URL-state design.
@@ -134,7 +136,7 @@ docs/
 
 1. **Read `docs/DESIGN.md` first.** It has the full calculation model and the golden fixtures.
 2. State the plan and the files you will touch before writing code.
-3. One session = one green, committable state. `npm run typecheck && npm run test && npm run build`
+3. One session = one green, committable state. `pnpm typecheck && pnpm test && pnpm lint && pnpm build`
    must all pass before you finish.
 4. **Append a dated entry to `docs/DECISIONS.md`** describing any judgment call you made that
    a future session would otherwise have to re-derive. This is not optional — it is how the

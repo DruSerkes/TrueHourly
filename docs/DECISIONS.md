@@ -859,3 +859,259 @@ by how the row's confidence is labelled.
 
 **Gates after this change:** typecheck, lint, build clean; **512 tests passing**,
 none skipped.
+
+---
+
+## 2026-10-20 — Session 5: state, the core six inputs, and the live result
+
+The engine was untouched this session, as the brief required. Everything below is
+`src/state/` and `src/ui/`.
+
+### 1. The reducer patches groups and replaces unions
+
+`CompensationInput` is nine groups of flat fields plus three discriminated unions
+(`equity`, `hours.ptoPlan`, `retirement.employerMatch`). Those two shapes want
+different actions, so they got different ones:
+
+- a flat group takes `patchCash` / `patchHours` / … with a `Partial` of that group;
+- a union is **replaced whole** — `setEquity`, `setPtoPlan`, `setEmployerMatch`.
+
+Patching a union is how you end up with `{ type: 'unlimited', ptoDays: 20 }`: a value
+whose fields contradict its own tag, which typechecks at the call site and is
+meaningless everywhere else. The caller builds a complete member and hands it over.
+`ptoDaysOf` / `withPtoDays` / `matchAmountOf` are the readers and writers that keep
+the UI from repeating the `type` check at every call site and eventually getting one
+of them backwards.
+
+One action per group rather than a single generic `{ group, patch }` was deliberate.
+The generic version needs a mapped type to tie `patch` to `group`, and when it is
+wrong the error names the mapped type rather than the field.
+
+`replace` exists for session 6: a restored save arrives as a whole input and the
+reducer should not have to learn anything about storage to accept it.
+
+### 2. Serializability is tested, not assumed
+
+Three later jobs — session 6's autosave, v2's shareable URL fragment, v2's compare
+mode — all assume `JSON.parse(JSON.stringify(state))` is the same value. A `Date`, a
+class instance or an `undefined` in the defaults breaks all three at once, and breaks
+them in session 6, far from the change that caused it. So `reducer.test.ts` walks the
+default input and asserts every leaf is a string, number or boolean, and round-trips
+the state after a run of edits. It is a cheap test for a failure that would otherwise
+surface as "my saved offer came back blank".
+
+### 3. Defaults invent no compensation figure
+
+`defaultCompensationInput()` opens with `baseSalary: 0`, no match, no premium, and
+`equity: { type: 'none' }`. Schedule assumptions (40 hours, 15 PTO days, 11 holidays)
+come from `constants.ts`, where they are already labelled assumptions; compensation
+figures do not get the same treatment, because a plausible invented salary on first
+load is exactly the "guess presented as a fact" invariant 6 exists to prevent.
+
+`equity` defaults to `none` rather than `unknown`: `unknown` emits a warning telling
+the user their equity is unvalued, and on first load the app does not know that they
+have any.
+
+### 4. Parsing: `null` means "unreadable", not "zero"
+
+`parseNumeric` accepts `180000`, `180,000`, `$180,000`, `180k`, `$1.8m`. It returns
+`null` for text it cannot read and `0` only for a genuinely empty field. The
+distinction is load-bearing: a user halfway through a paste has not said their salary
+is nothing, so the field keeps the last good number, leaves the characters visible,
+and marks itself `aria-invalid`. A parser that returned 0 instead would silently wipe
+the figure.
+
+**`180 000` is rejected.** Accepting a space as a group separator is indistinguishable
+from accepting `1 2` as twelve, and a typo that silently becomes a plausible number is
+worse than one that is visibly refused. The brief asked for commas, `k`, and `$`;
+space-separated groups were never on the list. This came out of a failing test I had
+written both ways by accident — worth recording so a future session does not "fix"
+the rejection.
+
+### 5. Fields hold a draft string while they are being typed in
+
+A field whose value is re-formatted on every keystroke fights the user: type `180,`
+and the comma vanishes. So each field keeps `draft: string | null`, where `null` means
+"not being edited — render the committed number". The parsed value is pushed to the
+reducer on each keystroke so the result stays live; the draft is dropped on blur.
+Rounding happens only in `format.ts`, never in state.
+
+### 6. The headline card is sticky, not the result column
+
+DESIGN.md §6 asks for a sticky result panel. The full panel — headline, tax slider,
+breakdown, warnings, five note cards — does not fit on a laptop screen, and both ways
+of pinning the whole thing fail: pin it and the bottom is unreachable; give the column
+its own scrollbar and the big number scrolls out of the panel, which is the one thing
+that was supposed to stay put. So the first card sticks and the rest flows. On mobile
+a separate `MobileSummaryBar` pins the figure to the bottom edge; it is `aria-hidden`,
+because everything in it is already announced by the panel's live region and hearing
+the rate twice with no way to tell the two apart is worse than not hearing it.
+
+### 7. Accessibility decisions worth not re-deriving
+
+- **The live region is debounced to 700ms.** The result recomputes per keystroke;
+  a polite region updated twenty times queues twenty announcements and keeps talking
+  after the user has stopped typing.
+- **The tax slider reports percent, not decimals.** A range stepping in 0.01 announces
+  `aria-valuenow="0.32"`, which reads as "nought point three two". The slider works in
+  integer percent with an explicit `aria-valuetext` of `32%`.
+- **The slider's text box has its own label.** A control sharing another control's
+  label is an unlabelled control.
+- **`helpId()` lives in `src/ui/ids.ts`.** Writing the `aria-describedby` string twice
+  is how it eventually gets written two ways; a mismatch is invisible in a browser.
+- **Estimated values are marked by shape and by a word**, never by colour alone:
+  a dashed border, italics, and an `est.` badge that expands to a full phrase for
+  screen readers.
+
+**Contrast was measured, not estimated**, over the exact hex values in `index.css`,
+and the first pass failed: `--color-line-strong` — the border that is the only
+indication of where an input is — sat at 2.2:1 against its surface in both themes,
+against the 3:1 that WCAG 1.4.11 requires for a control boundary. Darkened to `#857d75`
+(light, 3.9:1) and lightened to `#7b736c` (dark, 4.2:1). Every text pair clears AA
+with margin; the ratios in the comments are the measured ones. Re-measure on any
+change — that is the whole reason both palettes live in one file.
+
+### 8. `calculate` runs on every render, unmemoized
+
+It is pure, it touches a few dozen numbers, and it runs in well under a millisecond.
+A `useMemo` would add a dependency array to keep correct in exchange for nothing
+measurable. If that stops being true the fix is a memo in `App.tsx`, never a cache
+inside the engine.
+
+### Fixture A, verified by hand in the browser
+
+The six always-visible inputs **cannot express Fixture A**. It also needs a bonus
+percentage, an employer HSA contribution, free meals and an RSU grant, all of which
+live in session 6's collapsible sections. So it was verified in two parts, both
+against the running dev server:
+
+1. **Through the rendered UI.** Typing Fixture A's six fields (180,000 / 45h / 20 PTO
+   / 11 holidays / 7,200 match / 14,000 premium) at a 32% rate gives
+   **2,061 hours worked** and **$86.54** naive — both exactly Fixture A — with
+   **$97.62/hr** face value and **$100.82/hr** salary-equivalent on the $201,200 that
+   those six fields amount to. Hand-check: 201,200 ÷ 2,061 = 97.6225; 187,200 +
+   14,000/0.68 = 207,788.24, ÷ 2,061 = 100.82.
+2. **Through the real render boundary, on the full fixture.** `calculate` and
+   `format.ts` were imported from the live page and handed the complete Fixture A
+   input. They returned **$120.64** face value, **$124.85** salary-equivalent,
+   **$86.54** naive, **$248,635** and **$257,310**, over **2,061 hours** and
+   **229 days** — Fixture A to the cent, through the same formatters the components
+   call.
+
+The gap between the two is the session-6 inputs, not a disagreement. Re-verify part 1
+against the full fixture once those sections exist.
+
+### Deferred to session 6
+
+- The remaining ~20 inputs, in collapsible sections — including the equity section,
+  which is what makes the `showExpectedValue` toggle and the funding-stage selector
+  from the session-4 follow-up reachable.
+- `localStorage` autosave and the restore guard. `replace` is already in the reducer
+  for it.
+- Revisit whether the three unconditional note cards (`severance-policy`,
+  `on-call-burden`, `remote-vs-in-office`) should collapse into one "Questions worth
+  asking" card — carried over from session 4, and now answerable because the layout
+  exists. Current read, having seen them render: they are long enough that three
+  cards is a lot of unconditional text, and one card with three bullets would sit
+  better under the breakdown.
+- `eslint.config.js` has a dead block at the top: a `defineConfig` imported from
+  `vite` and called with an ESLint config whose result is discarded. Harmless, but it
+  is confusing to read and should go. Not touched here — it was outside the session's
+  scope and is not a UI change.
+
+**Gates after this session:** typecheck, lint, build clean; **560 tests passing**
+(512 engine, 48 new in `src/state/` and `src/ui/`), none skipped.
+
+---
+
+## 2026-10-20 — Session 5 follow-up: pnpm, and a dead block in the ESLint config
+
+### `pnpm dev` was failing, and it was the repo's fault, not the machine's
+
+`node_modules/.pnpm` exists and `pnpm-lock.yaml` is committed — this has been a pnpm
+project all along. I used `npm run` throughout session 5, which is why I never hit
+the failure:
+
+```
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.28.2
+```
+
+pnpm refuses to run a dependency's install scripts unless the package is approved,
+and `pnpm dev` runs a dependency check that shells out to `pnpm install` first — so
+it fails before Vite starts. The default is right: an install script runs arbitrary
+code on your machine before you have read a line of it. esbuild needs its script to
+put the prebuilt `@esbuild/<platform>` binary in place, and Vite's dev server and
+build both depend on esbuild.
+
+Fixed with `pnpm-workspace.yaml`:
+
+```yaml
+allowBuilds:
+  esbuild: true
+```
+
+Two details worth recording so the next person does not lose the time I did:
+
+- **The settings moved.** A `pnpm` field in package.json is no longer read
+  (`[WARN] The "pnpm" field in package.json is no longer read by pnpm`). As of pnpm
+  10 the settings file is `pnpm-workspace.yaml`, even in a single-package repo.
+- **The key is version-dependent.** pnpm 10 took `onlyBuiltDependencies`, a list;
+  pnpm 11 takes `allowBuilds`, a map. I wrote the pnpm 10 form first and it was
+  silently ignored. `pnpm approve-builds esbuild` writes the correct form.
+
+`"packageManager": "pnpm@11.17.0"` is now pinned in package.json so the tool is not a
+matter of local habit, and CLAUDE.md's commands say `pnpm` rather than `npm` —
+including `pnpm lint`, which the working-agreement line had been omitting.
+
+### Lockfiles are now Prettier-ignored
+
+`pnpm lint` then failed on `pnpm-lock.yaml`, which pnpm had just rewritten. A lockfile
+is generated and is not ours to style; reformatting one produces a large diff of pure
+noise. `pnpm-lock.yaml` and `package-lock.json` are in `.prettierignore`.
+
+### The dead `defineConfig` block is gone
+
+`eslint.config.js` opened with `defineConfig` imported from **vite** and called with
+an ESLint config whose return value was discarded. It did nothing: Vite's
+`defineConfig` is an identity function, and ESLint only ever reads the `export
+default` below it. It duplicated the real config, so the hazard was not cost but
+confusion — someone editing the rules at the top of the file would have changed
+nothing at all. Removed, along with the now-unused `vite` import.
+
+**Gates after this change, all run under pnpm:** typecheck, lint, build clean;
+**560 tests passing**, none skipped. `pnpm dev` serves on :5173.
+
+---
+
+## 2026-10-20 — Session 5 follow-up: the result panel does not stick on desktop
+
+Reverses item 6 of the session 5 entry, on use rather than on principle.
+
+DESIGN.md §6 specified a sticky result panel and session 5 built one, settling on
+pinning just the headline card after the two obvious approaches failed — the whole
+column pinned leaves its bottom unreachable, and the column with its own scrollbar
+lets the big number scroll out of the panel that was meant to hold it.
+
+Pinning the headline card solves both of those and is still the wrong answer. What
+hangs over the content you are scrolling to read is, by construction, the thing you
+have already read: the naive anchor and the headline figure. Everything a reader
+scrolls *for* — the breakdown, the warnings, the note cards — is underneath it, and
+on a laptop the card is tall enough to take a real bite out of the viewport.
+
+The general rule this is an instance of: **sticky earns its keep when the pinned
+element is a control you keep reaching for, not when it is an output.** The tax
+slider would be a defensible thing to pin. The answer is not. And on desktop the
+result already sits beside the field being typed into, which is the job sticky would
+have been doing.
+
+Mobile is unchanged. There the form and the result cannot share a screen, so
+`MobileSummaryBar` keeps the figure pinned to the bottom edge and genuinely earns it.
+
+DESIGN.md §6 now says "static on desktop" with a footnote, rather than leaving the
+spec and the code disagreeing silently.
+
+**Deferred, again, by request:** whether the three unconditional note cards collapse
+into one "Questions worth asking" card. To be decided after session 6 lands, against
+the finished product rather than against a half-built one.
+
+**Gates:** typecheck, lint, build clean; **560 tests passing**, none skipped.

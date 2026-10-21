@@ -461,12 +461,19 @@ Single page, progressive disclosure, live result.
   premium. Five inputs get you a meaningful number.
 - **Collapsible sections:** Equity, Retirement & savings, Health & insurance, Time & leave,
   Perks & stipends, Tax assumption.
-- **Result panel** (sticky on desktop, pinned bottom on mobile): the big number, the naive
+- **Result panel** (static on desktop, pinned bottom on mobile¹): the big number, the naive
   anchor struck through above it, a face-value ↔ salary-equivalent toggle, a stacked
   contribution breakdown, warnings, and the off-headline cards.
 - Estimated values render visually distinct from entered ones.
 - Every input has a plain-language "why this matters" affordance. The explanations _are_ the
   product for a first-time visitor.
+
+¹ Sticky on desktop was specified here and built in session 5, then removed after
+using it: the pinned card hangs over the breakdown you are scrolling to read, and
+what it is hanging there is the figure you have already looked at. On desktop the
+result sits beside the form anyway, which is the job sticky would have done. The
+mobile pin stays, because there the two cannot share the screen. See DECISIONS.md,
+2026-10-20 session 5 follow-up.
 
 Accessibility is not a phase-6 afterthought: labelled inputs, sliders with text-entry
 alternatives, results announced via a live region, keyboard-operable disclosures, and

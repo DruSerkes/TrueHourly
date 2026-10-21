@@ -1,1 +1,104 @@
 @import 'tailwindcss';
+
+/*
+ * Theme tokens.
+ *
+ * Both themes are defined here, next to each other, deliberately. The
+ * alternative — a `dark:` variant on every element — spreads the palette across
+ * a hundred call sites, and the accessibility requirement is a property of the
+ * PALETTE, not of any one component: every pair below was picked to clear WCAG
+ * AA (4.5:1 for body text, 3:1 for large text and UI boundaries) against the
+ * surface it sits on. Checking that is tractable in one file and impossible in
+ * a hundred.
+ *
+ * Contrast ratios noted per token are MEASURED against `--color-page` in that
+ * theme, not estimated — the figures came out of a contrast calculation over
+ * these exact hex values, and the first pass of them failed: the input border
+ * was at 2.2:1 and had to be darkened. Re-measure if you change a value.
+ */
+@theme {
+  --color-page: #faf9f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3f2f0;
+  --color-line: #ddd9d5;
+  --color-line-strong: #857d75; /* 3.9:1 on page — a control boundary, so WCAG
+                                   1.4.11 wants 3:1, not the 1.5:1 a decorative
+                                   hairline would get away with */
+
+  --color-ink: #1c1917; /* 16.6:1 */
+  --color-ink-muted: #57534e; /* 7.3:1  — body copy, help text */
+  --color-ink-faint: #6b6560; /* 5.5:1  — the faintest text on the page */
+
+  --color-accent: #0f766e; /* 5.2:1  — links, the headline figure */
+  --color-accent-strong: #115e59; /* 7.2:1  — accent text at small sizes */
+  --color-accent-ink: #ffffff; /* on --color-accent: 5.5:1 */
+  --color-accent-soft: #e6f4f1;
+
+  --color-caution: #8a4206; /* 7.0:1  — caution warnings */
+  --color-caution-soft: #fdf4e7;
+  --color-focus: #1d4ed8; /* 6.4:1  — focus ring */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #0c0a09;
+    --color-surface: #1c1917;
+    --color-surface-2: #262220;
+    --color-line: #3a3532;
+    --color-line-strong: #7b736c; /* 4.2:1 on page */
+
+    --color-ink: #f5f5f4; /* 18.1:1 */
+    --color-ink-muted: #b0a9a3; /* 8.5:1 */
+    --color-ink-faint: #968e88; /* 6.1:1 */
+
+    --color-accent: #5eead4; /* 13.4:1 */
+    --color-accent-strong: #7df0dd; /* 14.5:1 */
+    --color-accent-ink: #06201c; /* on --color-accent: 11.5:1 */
+    --color-accent-soft: #11302c;
+
+    --color-caution: #fcd34d; /* 13.7:1 */
+    --color-caution-soft: #2a2109;
+    --color-focus: #93c5fd; /* 11.0:1 */
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * One focus style for the whole app, applied to anything focusable rather than
+ * per-component, so a control added later cannot forget it. `:focus-visible`
+ * rather than `:focus` keeps the ring off mouse clicks on buttons while keeping
+ * it on for keyboard users — which is the entire point of having it.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/*
+ * Native range inputs do not inherit an accent colour or a usable focus ring.
+ * Both are set here for the same reason as the rule above.
+ */
+input[type='range'] {
+  accent-color: var(--color-accent);
+}
+
+/* Respect a user who has asked for less motion; nothing here animates by
+ * necessity, so the safe default is to switch it all off. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
