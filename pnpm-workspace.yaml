@@ -1,0 +1,6 @@
+# Without this entry `pnpm dev` fails with ERR_PNPM_IGNORED_BUILDS before Vite
+# ever starts. Written by `pnpm approve-builds esbuild`; the key is `allowBuilds`
+# on pnpm 11 (it was `onlyBuiltDependencies`, a list, on pnpm 10). Add a package
+# here only when you have a reason to trust it.
+allowBuilds:
+  esbuild: true
