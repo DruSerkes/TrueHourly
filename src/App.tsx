@@ -69,7 +69,7 @@ function initialState(): { input: CompensationInput; restored: boolean } {
 }
 
 export default function App() {
-  const [{ input: initialInput, restored }] = useState(initialState);
+  const [{ input: initialInput }] = useState(initialState);
   const [input, rawDispatch] = useReducer(inputReducer, initialInput);
   const [mode, setMode] = useState<ValueMode>('faceValue');
   const result = calculate(input);

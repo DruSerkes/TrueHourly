@@ -19,12 +19,7 @@
  * input — switching views is not a change to the user's compensation.
  */
 
-import {
-  DEFAULT_TAX_RATE,
-  NAIVE_ANNUAL_HOURS,
-  TAX_RATE_PRESETS,
-  WEEKS_PER_YEAR,
-} from '../engine/constants.ts';
+import { DEFAULT_TAX_RATE, TAX_RATE_PRESETS, WEEKS_PER_YEAR } from '../engine/constants.ts';
 import type { CompensationInput, TrueHourlyResult } from '../engine/types.ts';
 import type { InputAction } from '../state/reducer.ts';
 import { Breakdown } from './Breakdown.tsx';
