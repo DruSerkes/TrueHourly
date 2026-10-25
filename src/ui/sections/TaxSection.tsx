@@ -40,14 +40,7 @@ export function TaxSection({ input, dispatch }: InputSectionProps) {
         max={MAX_TAX_RATE}
         value={tax.deferredRate}
         help="Default 0% — a 401(k) match is counted at face value. Raising it discounts it."
-        why="A dollar of employer 401(k) match is not a dollar of salary: you cannot spend it
-             until 59½, and it is taxed as ordinary income when you finally do. This app counts
-             it at face value anyway, which is the conservative choice in the sense that it
-             refuses to inflate it the way a tax-free benefit is inflated — but it does not
-             discount it either, because how much that illiquidity is worth to you depends on
-             your age and your savings, which the app has no business guessing. If you want to
-             see the match marked down, that judgment goes here, and the result panel notes that
-             you made it."
+        why="Your 401(k) match is locked until 59½ and taxed when you withdraw it. It is counted at face value unless you discount it here."
         onChange={(deferredRate) => dispatch({ type: 'patchTax', patch: { deferredRate } })}
       />
 

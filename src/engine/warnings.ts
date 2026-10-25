@@ -61,8 +61,7 @@ export function noHoursWorked(): Warning {
     id: 'no-hours-worked',
     severity: 'caution',
     message:
-      'Your time off adds up to the whole year, so there are no hours to divide by. ' +
-      'The hourly figures are shown as $0 rather than as an error.',
+      'Your time off covers the whole year, so there are no hours to divide by. Hourly figures show as $0.',
   };
 }
 
@@ -70,10 +69,7 @@ export function longHours(hoursPerWeek: number): Warning {
   return {
     id: 'long-hours',
     severity: 'caution',
-    message:
-      `At ${hoursPerWeek} hours a week, the headline treats all of those hours ` +
-      'as compensated. If the extra hours are unpaid, your true hourly rate is lower ' +
-      'than the same package would pay at 40 hours.',
+    message: `At ${hoursPerWeek} hours a week, your pay is spread over more hours than a standard 40, which lowers your hourly rate.`,
   };
 }
 
@@ -81,9 +77,7 @@ export function hoursOverridden(hoursWorked: number): Warning {
   return {
     id: 'hours-overridden',
     severity: 'info',
-    message:
-      `You set annual hours worked directly (${hoursWorked}), so PTO and holidays ` +
-      'are not being used to derive the denominator.',
+    message: `You set annual hours directly (${hoursWorked}), so PTO and holidays are ignored.`,
   };
 }
 
@@ -92,8 +86,7 @@ export function unlimitedPtoNoPayout(): Warning {
     id: 'unlimited-pto-no-payout',
     severity: 'info',
     message:
-      'Unlimited PTO carries no accrued balance, so there is nothing to pay out when you ' +
-      'leave. An accrual plan with the same days taken is worth more at separation.',
+      'Unlimited PTO has no balance, so nothing is paid out when you leave unlike an accrual plan.',
   };
 }
 
@@ -105,11 +98,7 @@ export function signOnClawbackOutlastsTenure(clawbackMonths: number, tenureYears
   return {
     id: 'sign-on-clawback-outlasts-tenure',
     severity: 'caution',
-    message:
-      `Your sign-on clawback runs for ${clawbackMonths} months, longer than the ` +
-      `${tenureYears} years you expect to stay. If you leave while it is still in ` +
-      'force you would repay some or all of the bonus, so the figures above count money ' +
-      'that is not yet unconditionally yours.',
+    message: `Your sign-on clawback lasts ${clawbackMonths} months, longer than the ${tenureYears} years you plan to stay. Leave early and you may have to pay some of it back.`,
   };
 }
 
@@ -121,10 +110,7 @@ export function taxRateClamped(appliedRate: number): Warning {
   return {
     id: 'tax-rate-clamped',
     severity: 'caution',
-    message:
-      `Your combined marginal rate was outside the usable range and has been ` +
-      `treated as ${(appliedRate * 100).toFixed(0)}%. ` +
-      `Rates at or above 100% make the salary-equivalent figure meaningless.`,
+    message: `Your tax rate was out of range, so ${(appliedRate * 100).toFixed(0)}% was used instead.`,
   };
 }
 
@@ -132,9 +118,7 @@ export function deferredRateClamped(appliedRate: number): Warning {
   return {
     id: 'deferred-rate-clamped',
     severity: 'caution',
-    message:
-      `Your tax-deferred rate was outside the usable range and has been ` +
-      `treated as ${(appliedRate * 100).toFixed(0)}%.`,
+    message: `Your tax-deferred rate was out of range, so ${(appliedRate * 100).toFixed(0)}% was used instead.`,
   };
 }
 
@@ -143,10 +127,7 @@ export function deferredRateRaised(): Warning {
     id: 'deferred-rate-raised',
     severity: 'info',
     message:
-      `You are grossing up tax-deferred money. Employer 401(k) contributions ` +
-      `escape payroll tax permanently, but they are taxed as ordinary income on ` +
-      `withdrawal and are not accessible without penalty until age 59.5 — so ` +
-      `they are worth less per dollar than a tax-free benefit.`,
+      'You are grossing up 401(k) money. It is locked until 59½ and taxed when you withdraw it, so it is worth less per dollar than a tax-free benefit.',
   };
 }
 
@@ -159,10 +140,8 @@ export function annualAdditionsLimitClamped(): Warning {
     id: 'annual-additions-limit-clamped',
     severity: 'caution',
     message:
-      `Employer retirement contributions came to more than the ${money(LIMIT_DEFINED_CONTRIBUTION_TOTAL)} ` +
-      'IRS annual additions limit for 2026, so they have been scaled back proportionally to fit. ' +
-      'The limit also counts your own 401(k) contributions, which this app does not ask for, ' +
-      'so your real headroom is smaller than this.',
+      `Employer retirement contributions are over the ${money(LIMIT_DEFINED_CONTRIBUTION_TOTAL)} IRS limit for 2026, so they were scaled down to fit. ` +
+      'The limit includes your own 401(k) contributions too, so your real room is smaller.',
   };
 }
 
@@ -172,10 +151,8 @@ export function matchVestingCliff(matchAmount: number, vestingYears: number): Wa
     id: 'match-vesting-cliff',
     severity: 'caution',
     message:
-      `The ${money(matchAmount)} employer match takes ${vestingYears} ` +
-      `year${vestingYears === 1 ? '' : 's'} to vest. Until then it is not yours: leaving early ` +
-      'forfeits some or all of it, so the headline counts money you may never keep. Your own ' +
-      'contributions are always 100% yours — this applies only to the employer’s.',
+      `The ${money(matchAmount)} employer match takes ${vestingYears} year${vestingYears === 1 ? '' : 's'} to vest. ` +
+      'Leave before then and you lose some or all of it. Your own contributions are always 100% yours.',
   };
 }
 
@@ -191,10 +168,8 @@ export function hsaContributionClamped(
     id: 'hsa-contribution-clamped',
     severity: 'caution',
     message:
-      `The employer HSA contribution you entered is above the 2026 ${coverageTier === 'family' ? 'family' : 'self-only'} ` +
-      `HSA limit of ${money(limit)}, so it has been capped at the limit. ` +
-      'That limit covers your own contributions as well as your employer’s, so the room ' +
-      'left for you is smaller still.',
+      `Your employer HSA contribution is over the 2026 ${coverageTier === 'family' ? 'family' : 'self-only'} limit of ${money(limit)}, so it was capped. ` +
+      'That limit includes your own contributions too.',
   };
 }
 
@@ -206,10 +181,7 @@ export function commuterBenefitClamped(): Warning {
   return {
     id: 'commuter-benefit-clamped',
     severity: 'caution',
-    message:
-      `The qualified transportation exclusion is $${LIMIT_COMMUTER_MONTHLY} a month in 2026, so your ` +
-      'commuter benefit has been capped at that. Anything your employer gives you above the ' +
-      'limit is taxable wages rather than a tax-free benefit.',
+    message: `Commuter benefits are tax-free up to $${LIMIT_COMMUTER_MONTHLY} a month in 2026. Anything above that is taxable wages and is not counted here.`,
   };
 }
 
@@ -217,10 +189,7 @@ export function tuitionReimbursementClamped(): Warning {
   return {
     id: 'tuition-reimbursement-clamped',
     severity: 'caution',
-    message:
-      `IRC §127 excludes up to ${money(LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE)} of employer education ` +
-      'assistance a year, so the tax-free part has been capped there. The rest is still real ' +
-      'money — it is just taxable wages, so it is not counted as a tax-free benefit here.',
+    message: `Education assistance is tax-free up to ${money(LIMIT_SECTION_127_EDUCATIONAL_ASSISTANCE)} a year. Anything above that is taxable wages and is not counted here.`,
   };
 }
 
@@ -233,9 +202,7 @@ export function equityUnknown(): Warning {
     id: 'equity-unknown',
     severity: 'caution',
     message:
-      'You have equity but no value for it, so it is counted as $0 — the headline below is a ' +
-      'floor, not an estimate. If it is private-company stock, the private estimator will give ' +
-      'you a range with its assumptions shown instead of a single number nobody can justify.',
+      'Your equity has no value entered, so it counts as $0 and the headline is a floor. For private stock, use the private estimator to see a range.',
   };
 }
 
@@ -244,10 +211,8 @@ export function privateEquityHeadlineZero(modestPerYear: number): Warning {
     id: 'private-equity-headline-zero',
     severity: 'info',
     message:
-      'Private-company equity is counted as $0 in the headline on purpose: most startup equity ' +
-      `ends up worth nothing, and a confident number here would be a guess dressed as a fact. ` +
-      `The scenario range beside it — ${money(modestPerYear)} a year if the company exits near its last ` +
-      'round — is where that value is shown, with every assumption listed.',
+      'Private equity counts as $0 in the headline because most startup equity ends up worthless. ' +
+      `If the company sells near its last round, it would be worth about ${money(modestPerYear)} a year.`,
   };
 }
 
@@ -255,10 +220,7 @@ export function equityCliffContingent(cliffMonths: number): Warning {
   return {
     id: 'equity-cliff-contingent',
     severity: 'caution',
-    message:
-      `Your grant has a ${cliffMonths}-month cliff, so none of it is yours until then. The ` +
-      'per-year figure above spreads the grant evenly across the vesting period, which means ' +
-      'it counts value you would forfeit entirely by leaving before the cliff.',
+    message: `Your grant has a ${cliffMonths}-month cliff. Leave before then and you get none of it, even though the yearly figure counts it.`,
   };
 }
 
@@ -266,11 +228,7 @@ export function equityInitialGrantNotSteadyState(vestYears: number): Warning {
   return {
     id: 'equity-initial-grant-not-steady-state',
     severity: 'info',
-    message:
-      `This is one grant spread over ${vestYears} year${vestYears === 1 ? '' : 's'}. Year 1 and ` +
-      'year 5 are not the same job: without refresher grants the equity income stops when this ' +
-      'grant finishes vesting, and with them it can be higher. Ask what refreshers look like ' +
-      'before treating this as a steady annual rate.',
+    message: `This grant vests over ${vestYears} year${vestYears === 1 ? '' : 's'}. Without refresher grants, equity income stops after that, so ask what refreshers look like.`,
   };
 }
 
@@ -279,10 +237,8 @@ export function optionsUnderwater(fairMarketValue: number, strikePrice: number):
     id: 'options-underwater',
     severity: 'caution',
     message:
-      `Your strike price of ${money(strikePrice)} is above the current fair market value of ` +
-      `${money(fairMarketValue)}, so these options are underwater and are counted as $0. They are ` +
-      'not worthless — they regain value if the share price rises above the strike — but today ' +
-      'exercising them would cost more than the shares are worth.',
+      `Your strike price (${money(strikePrice)}) is above the current value (${money(fairMarketValue)}), so these options are underwater and count as $0. ` +
+      'They are not worthless: they regain value if the price rises above the strike.',
   };
 }
 
@@ -290,11 +246,7 @@ export function optionsExerciseCost(exerciseCost: number, grantShares: number): 
   return {
     id: 'options-exercise-cost',
     severity: 'caution',
-    message:
-      `Options are not shares. Turning all ${Math.round(grantShares).toLocaleString('en-US')} of ` +
-      `them into stock costs ${money(exerciseCost)} of your own money at the strike price, and the ` +
-      'figure above does not subtract that. A grant you cannot afford to exercise is worth less ' +
-      'than its intrinsic value suggests.',
+    message: `Exercising all ${Math.round(grantShares).toLocaleString('en-US')} options costs ${money(exerciseCost)} of your own money, which the figure above does not subtract.`,
   };
 }
 
@@ -303,9 +255,7 @@ export function isoAmtExposure(): Warning {
     id: 'iso-amt-exposure',
     severity: 'caution',
     message:
-      'Exercising an ISO and holding the shares adds the spread to your alternative minimum tax ' +
-      'income, so a year with no cash proceeds can still produce a tax bill. This app does not ' +
-      'model AMT — treat it as a reason to get advice before a large exercise.',
+      'Exercising ISOs and holding the shares can trigger alternative minimum tax, even with no cash in hand. This app does not model AMT, so get advice before a large exercise.',
   };
 }
 
@@ -332,9 +282,7 @@ export function noCompensationEntered(): Warning {
   return {
     id: 'no-compensation-entered',
     severity: 'info',
-    message:
-      'No compensation has been entered yet, so every figure below is $0. Start with base ' +
-      'salary — that alone gives you the naive hourly rate this app exists to correct.',
+    message: 'Nothing entered yet. Start with your base salary.',
   };
 }
 
@@ -354,10 +302,8 @@ export function largeEstimatedLineItems(items: readonly LineItem[], faceTotal: n
     id: 'large-estimated-line-item',
     severity: 'caution',
     message:
-      `${named.length === 1 ? 'An estimate makes' : 'Estimates make'} up a large share of this ` +
-      `package: ${named.join('; ')}. ${named.length === 1 ? 'That figure is' : 'Those figures are'} ` +
-      'not something you entered, so the headline is only as good as the assumption behind ' +
-      `${named.length === 1 ? 'it' : 'them'}.`,
+      `Estimated, not entered: ${named.join('; ')}. ` +
+      `${named.length === 1 ? 'It is' : 'They are'} a large share of your package, so the headline depends on ${named.length === 1 ? 'that guess' : 'those guesses'}.`,
   };
 }
 

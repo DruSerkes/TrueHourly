@@ -2,7 +2,7 @@
  * Off-headline cards (DESIGN.md §2.6).
  *
  * These are real parts of a compensation package that are not dollars per hour:
- * a PTO balance paid out when you leave, a severance policy, the on-call rota,
+ * a PTO balance paid out when you leave, the on-call rota,
  * a vesting cliff. The engine keeps them in their own array precisely so that
  * no summing loop can pick them up, and this component keeps them visually
  * separate for the same reason — a card that looked like a line item would
@@ -23,10 +23,10 @@ export function NoteCards({ notes }: { notes: readonly Note[] }) {
   return (
     <section aria-labelledby="notes-heading">
       <h3 className="text-sm font-semibold text-ink" id="notes-heading">
-        Worth knowing, but not per-hour
+        Worth knowing
       </h3>
       <p className="mt-1 text-xs text-ink-faint">
-        None of these are counted in the figures above — they are one-offs, or they are not money at
+        None of these are counted in the figures above. They are one-offs, or they are not money at
         all.
       </p>
       <ul className="mt-2 space-y-2">

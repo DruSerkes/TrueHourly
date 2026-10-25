@@ -1325,3 +1325,27 @@ than leaving the spec describing a page that no longer exists.
 
 **Gates:** typecheck, lint, build clean; **594 tests passing**. Fixture A re-verified
 through the moved fields: **$120.64**, 2,061 hours, $248,635. axe-core: 0 violations.
+
+## 2026-10-22 — Field "why" copy cut to one or two sentences
+
+Every `why=` disclosure in `src/ui/` was rewritten at the owner's request: the old
+copy read as over-explained and cluttered the UI. Each one now says what the field
+does to the number and, where it matters, one worked example. Dropped on purpose:
+justifications of modelling choices (single tax rate vs brackets, why commute is
+excluded, why option time value is unpriced). Those belong in DESIGN.md and
+"How this works", not beside an input. Worked dollar examples were rechecked
+($14,000 ÷ 0.68 ≈ $20,600; $10,000 ÷ 0.85 ≈ $11,765, etc.).
+
+Same pass applied to every warning message in `src/engine/warnings.ts`. Ids,
+severities and triggers are unchanged; only wording moved. Phrases the tests pin
+(e.g. "private estimator", "not worthless", "always 100% yours") were kept. One
+test changed: the deferred-rate warning now says "59½" to match the field copy,
+instead of "59.5". The commuter and §127 warnings now say outright that the excess
+"is not counted here", which is what `perks.ts` does: it drops the excess and does
+not move it to `taxable`. Whether it should is **deferred**.
+
+Then the off-headline note bodies in `src/engine/notes.ts`, same rules. Titles,
+amounts and confidence unchanged. The vesting note no longer repeats "your own
+contributions are always 100% vested", because the `match-vesting-cliff` warning
+already says it. The severance note no longer says "not counted above", because
+the section subheading in `NoteCards.tsx` already says that for every card.

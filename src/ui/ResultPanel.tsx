@@ -113,15 +113,7 @@ export function ResultPanel({ input, result, dispatch, mode, onModeChange }: Res
         ) : (
           <>
             <p className="text-sm text-ink-muted">
-              You probably think you earn{' '}
-              <span className="line-through decoration-2 tabular-nums">
-                {formatHourly(result.baseHourlyNaive)}
-              </span>{' '}
-              an hour
-              <span className="text-ink-faint">
-                {' '}
-                &mdash; base salary ÷ {formatCount(NAIVE_ANNUAL_HOURS)}
-              </span>
+              Your true hourly rate, {MODE_LABELS[mode].toLowerCase()}
             </p>
 
             <p className="mt-1 flex items-baseline gap-2">
@@ -186,12 +178,7 @@ export function ResultPanel({ input, result, dispatch, mode, onModeChange }: Res
           help={`Federal income tax + FICA + state + local, as one rate. Default ${formatPercent(
             DEFAULT_TAX_RATE
           )}. Only the salary-equivalent figure uses it.`}
-          why="A tax-free benefit is worth more than the same number of salary dollars, and how
-               much more depends entirely on your marginal rate. At 22% a $14,000 health premium
-               is worth about $17,900 of salary; at 42% it is worth about $24,100. This app uses
-               one rate rather than a full bracket calculation, because the job here is unit
-               conversion and a bracket engine would imply a precision the rest of the inputs
-               cannot support."
+          why="Tax-free benefits are worth more than the same amount of salary. At 22%, a $14,000 health premium equals about $17,900 of salary; at 42%, about $24,100."
           onChange={(combinedMarginalRate) =>
             dispatch({ type: 'patchTax', patch: { combinedMarginalRate } })
           }

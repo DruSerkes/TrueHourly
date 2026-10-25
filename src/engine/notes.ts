@@ -63,10 +63,7 @@ function ptoSeparationNote(input: CompensationInput, hours: HoursBreakdown): Not
     return {
       id: 'pto-separation-payout',
       title: 'PTO payout at separation',
-      body:
-        'An unlimited plan accrues no balance, so there is nothing to pay out when you leave. ' +
-        'An accrual plan with the same days taken is worth more on your last day — which is ' +
-        'the one unambiguous difference between the two plan types.',
+      body: 'Unlimited PTO has no balance, so there is nothing to pay out when you leave.',
       amount: 0,
       confidence: 'entered',
     };
@@ -79,11 +76,9 @@ function ptoSeparationNote(input: CompensationInput, hours: HoursBreakdown): Not
     id: 'pto-separation-payout',
     title: 'PTO payout at separation',
     body:
-      `An accrual plan carries a balance your employer must pay out. At ${balanceDays} ` +
-      `day${balanceDays === 1 ? '' : 's'} on the books and a daily rate of ` +
-      `$${Math.round(dailyRateFor(input.cash.baseSalary, hours)).toLocaleString('en-US')}, that is a ` +
-      'one-time payment on your last day — not part of your hourly rate, which is why it is ' +
-      'shown here rather than in the totals.',
+      `${balanceDays} unused day${balanceDays === 1 ? '' : 's'} at ` +
+      `$${Math.round(dailyRateFor(input.cash.baseSalary, hours)).toLocaleString('en-US')} a day, ` +
+      'paid once when you leave.',
     amount: dollars(payout),
     // Estimated, not entered: the user gave a balance they EXPECT to hold, and
     // the daily rate is the app's own derivation from salary.
@@ -109,9 +104,7 @@ export function computeNotes(input: CompensationInput, hours: HoursBreakdown): N
       title: '401(k) vesting schedule',
       body:
         `Employer contributions take ${vestingYears} year${vestingYears === 1 ? '' : 's'} to ` +
-        'become yours. Ask whether the schedule is a cliff (nothing, then everything) or graded ' +
-        '(a share each year) — the difference decides what leaving in year two costs you. Your ' +
-        'own contributions are always 100% vested.',
+        'vest. Ask whether it is a cliff (all at once) or graded (a share each year).',
       confidence: 'entered',
     });
   }
@@ -122,30 +115,18 @@ export function computeNotes(input: CompensationInput, hours: HoursBreakdown): N
       id: 'equity-cliff',
       title: 'Equity cliff',
       body:
-        `Nothing vests for ${Math.round(cliffMonths)} months. Leaving — or being let go — one ` +
-        'day before the cliff means the entire grant is forfeited, so the per-year equity figure ' +
-        'in the totals is contingent in a way salary is not.',
+        `Nothing vests for ${Math.round(cliffMonths)} months. Leave or get let go before then ` +
+        'and you lose the whole grant.',
       confidence: 'entered',
     });
   }
 
   notes.push({
-    id: 'severance-policy',
-    title: 'Severance policy',
-    body:
-      'Nothing in the figures above accounts for what happens if the job ends. A written ' +
-      'severance policy is worth real money in a layoff and most offers do not mention one, so ' +
-      'it is worth asking before you sign rather than after.',
-    confidence: 'unknown',
-  });
-
-  notes.push({
     id: 'on-call-burden',
     title: 'On-call burden',
     body:
-      'On-call weeks are hours the job consumes whether or not you are paged, and they rarely ' +
-      'appear in an hours-per-week figure. If the rotation is unpaid, your real hourly rate is ' +
-      'below the one shown; if it carries a stipend, count that as compensation.',
+      'On-call time rarely shows up in hours per week. If it is unpaid, your real rate is ' +
+      'lower. If it pays a stipend, add that as compensation.',
     confidence: 'unknown',
   });
 
@@ -156,12 +137,8 @@ export function computeNotes(input: CompensationInput, hours: HoursBreakdown): N
     body:
       (commute > 0
         ? `A ${Math.round(commute)}-minute commute each way is about ` +
-          `${Math.round(((commute * 2) / 60) * hours.daysWorked)} hours a year of unpaid time, ` +
-          'plus fare or fuel. '
-        : '') +
-      'Commute time is collected but deliberately left out of the headline denominator — ' +
-      'folding unpaid travel into "hours worked" makes the number arguable. Free meals and a ' +
-      'wardrobe you only need in an office cut the other way.',
+          `${Math.round(((commute * 2) / 60) * hours.daysWorked)} hours a year, unpaid. `
+        : '') + 'Commute time is left out of the headline so rates stay comparable across jobs.',
     confidence: commute > 0 ? 'entered' : 'unknown',
   });
 

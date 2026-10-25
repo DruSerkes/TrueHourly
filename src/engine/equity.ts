@@ -282,7 +282,7 @@ function optionsEquity(equity: OptionsEquity): EquityContribution {
         ? `Strike $${strike.toLocaleString('en-US')} against a fair market value of ` +
           `$${fmv.toLocaleString('en-US')}: underwater, so counted as $0 rather than as a ` +
           'negative. The options still have value if the price recovers.'
-        : `Intrinsic value only — $${fmv.toLocaleString('en-US')} market value less the ` +
+        : `Intrinsic value only: $${fmv.toLocaleString('en-US')} market value less the ` +
           `$${strike.toLocaleString('en-US')} strike, on the shares vesting each year. It does ` +
           'not subtract the cost of exercising, and it assigns no value to the remaining ' +
           'option time, which is real but unpriceable here.',

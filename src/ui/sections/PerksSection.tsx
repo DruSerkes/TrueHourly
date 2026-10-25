@@ -42,13 +42,9 @@ export function PerksSection({ input, result, dispatch, mode }: InputSectionProp
         label="Free or subsidised meals"
         checked={perks.meals.enabled}
         help="Valued per day actually worked, not per calendar day."
-        why={`This is the perk the per-hour view flatters most. At $15 a day across ${formatCount(
-          result.hours.daysWorked
-        )} days actually worked it comes to ${formatDollars(
+        why={`At $15 a day across ${formatCount(result.hours.daysWorked)} working days, that is ${formatDollars(
           15 * result.hours.daysWorked
-        )} a year, tax-free — and because it is tax-free it is worth noticeably more than the same
-             amount of salary. It is priced against days worked rather than 260, so taking more
-             time off correctly reduces it.`}
+        )} a year, tax-free. More time off means fewer meals.`}
         onChange={(enabled) =>
           dispatch({ type: 'patchPerks', patch: { meals: { ...perks.meals, enabled } } })
         }
@@ -74,10 +70,7 @@ export function PerksSection({ input, result, dispatch, mode }: InputSectionProp
         help={`Per MONTH, not per year — the tax-free limit is ${formatDollars(
           LIMIT_COMMUTER_MONTHLY
         )} a month for 2026.`}
-        why="Stated monthly because the statutory exclusion is monthly and plans are written that
-             way; the engine multiplies by twelve after checking the limit. Anything above the
-             limit is taxable wages rather than a tax-free benefit, and the result panel says so
-             instead of quietly using the capped figure."
+        why="Entered monthly to match the IRS limit. Anything above the limit is taxable, and the result panel says so."
         onChange={(commuterBenefitMonthly) =>
           dispatch({ type: 'patchPerks', patch: { commuterBenefitMonthly } })
         }
@@ -118,9 +111,7 @@ export function PerksSection({ input, result, dispatch, mode }: InputSectionProp
         label="Professional development budget"
         value={perks.professionalDevelopment}
         help="Conferences, courses, books. Per year — count what you actually use."
-        why="Worth entering at what you realistically spend rather than what the policy allows. An
-             unused budget is not compensation, and a $5,000 line nobody claims is the easiest way
-             to make this whole number wrong in your own favour."
+        why="Enter what you will actually spend, not the policy maximum. An unused budget is not compensation."
         onChange={(professionalDevelopment) =>
           dispatch({ type: 'patchPerks', patch: { professionalDevelopment } })
         }
@@ -135,11 +126,7 @@ export function PerksSection({ input, result, dispatch, mode }: InputSectionProp
           { value: 'tax_free', label: 'Reimbursed against receipts (tax-free)' },
         ]}
         help="Applies to the home-office, wellness and development budgets above."
-        why="A $1,200 stipend paid as wages is worth $1,200; the same amount reimbursed against
-             receipts under an accountable plan is worth about $1,760 at a 32% marginal rate,
-             because it is never taxed. Same perk, different value, and nothing in the amount
-             itself reveals which one you have — so the app asks rather than assuming. It defaults
-             to taxable, the less flattering of the two."
+        why="Reimbursements are tax-free; stipends paid as wages are not. $1,200 reimbursed is worth about $1,760 of salary at a 32% rate. Defaults to taxable."
         onChange={(stipendTaxTreatment) =>
           dispatch({ type: 'patchPerks', patch: { stipendTaxTreatment } })
         }

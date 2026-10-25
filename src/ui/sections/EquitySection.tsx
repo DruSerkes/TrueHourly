@@ -126,19 +126,15 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
           label: MODE_LABELS[type],
         }))}
         help="This changes how the value is calculated, not just what it is called."
-        why="A public RSU has an observable price, so its value is a fact. A private share has no
-             price, so a single number would be a guess presented as a fact — it gets a range
-             instead. An option is a right to buy, so only the spread over the strike counts, and
-             even that ignores what exercising would cost you."
+        why="Public RSUs have a market price. Private shares do not, so they get a range. Options count only the gain above the strike price."
         onChange={changeMode}
       />
 
       {equity.type === 'unknown' && (
         <p className="py-3 text-sm text-ink-muted">
           Counted as $0, which makes your headline a floor: your package is worth at least that much
-          and probably more. That is the honest treatment of a number nobody has given you — and
-          &ldquo;ask what the strike price and the last round&rsquo;s valuation were&rdquo; is a
-          reasonable thing to take back to a recruiter.
+          and probably more. That is the honest treatment of a number nobody has given you. It's
+          reasonable to ask a recruiter what the strike price and the last round's valuation were
         </p>
       )}
 
@@ -160,10 +156,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             precise
             value={equity.pricePerShare}
             help="Today's market price. This app does not call out for a quote — no input leaves the browser."
-            why="RSUs are taxed as ordinary income at the price on the day they vest, which is also
-                 the day you could sell them. That makes them the one kind of equity genuinely
-                 comparable to salary — and it is why the price you enter should be today's, not
-                 the one in your offer letter."
+            why="RSUs are taxed at the price on the day they vest. Use today's price, not the one in your offer letter."
             onChange={(pricePerShare) =>
               dispatch({ type: 'setEquity', equity: { ...equity, pricePerShare } })
             }
@@ -187,9 +180,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             max={48}
             value={equity.cliffMonths}
             help="Months before the first vest. 12 is common; 0 means it vests from the start."
-            why="Nothing vests before the cliff. A twelve-month cliff makes the whole first year's
-                 equity contingent on still being there, which the result panel flags — the figure
-                 is right, but it is not money you have yet."
+            why="Nothing vests before the cliff, so your first year of equity depends on staying that long."
             onChange={(cliffMonths) =>
               dispatch({ type: 'setEquity', equity: { ...equity, cliffMonths } })
             }
@@ -225,11 +216,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             precise
             value={equity.fairMarketValue}
             help="Per share. For a private company this is the latest 409A valuation."
-            why="Only the spread between this and the strike is counted, and it is floored at zero:
-                 an underwater option is worth nothing today, never a liability. The figure also
-                 ignores two real things — what exercising would cost you in cash, and the value of
-                 the remaining time on the option, which cannot be priced here without a
-                 volatility assumption this app has no source for."
+            why="Only the gain above the strike price counts, and never less than zero. The cost of exercising is not included."
             onChange={(fairMarketValue) =>
               dispatch({ type: 'setEquity', equity: { ...equity, fairMarketValue } })
             }
@@ -243,10 +230,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
               { value: 'nso', label: 'NSO / NQSO — non-qualified' },
             ]}
             help="On your grant agreement. It changes the tax exposure, not the value."
-            why="ISOs can trigger alternative minimum tax on the spread in the year you exercise,
-                 even if you sell nothing and receive no cash — people have owed five-figure tax
-                 bills on paper gains that later evaporated. NSOs are taxed as ordinary income at
-                 exercise, which is simpler and usually cheaper to be surprised by."
+            why="ISOs can trigger alternative minimum tax when you exercise, even if you do not sell. NSOs are taxed as regular income at exercise."
             onChange={(optionClass) =>
               dispatch({ type: 'setEquity', equity: { ...equity, optionClass } })
             }
@@ -307,10 +291,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             precise
             value={equity.lastPreferredPricePerShare}
             help="What investors paid in the most recent round. Ask — many companies will tell you."
-            why="This is the number recruiters multiply your shares by, and it is the wrong one:
-                 investors bought preferred stock, which gets paid first and carries protections
-                 your common stock does not. It is the right starting point, but only a starting
-                 point — the two haircuts below exist to take it apart."
+            why="The price recruiters quote, but it is for investors' preferred stock. Your common stock is worth less, which the adjustments below account for."
             onChange={(lastPreferredPricePerShare) =>
               dispatch({ type: 'setEquity', equity: { ...equity, lastPreferredPricePerShare } })
             }
@@ -345,12 +326,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             max={1}
             value={equity.commonDiscount}
             help="How much less your common stock is worth than the preferred price. Default 30%."
-            why="Investors hold preferred stock: in a sale they get their money back before common
-                 shareholders get anything, and they often hold protections that pay them more than
-                 their share. Your common stock is behind all of that, so it is worth less per
-                 share than the last round implies — 20–40% less is the usual range, and
-                 dramatically more if the company has raised a lot of money relative to what it
-                 might sell for."
+            why="Investors get paid back before common shareholders in a sale, so common stock is usually worth 20–40% less per share."
             onChange={(commonDiscount) =>
               dispatch({ type: 'setEquity', equity: { ...equity, commonDiscount } })
             }
@@ -362,10 +338,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             max={1}
             value={equity.expectedDilution}
             help="How much of your stake future funding rounds will take. Default 25%."
-            why="Every round issues new shares, so your slice shrinks even though your share count
-                 does not. A company that will raise two more rounds before any exit will dilute
-                 you by something like 20–40% in total. This is the haircut people forget entirely,
-                 because nothing in your grant paperwork mentions it."
+            why="Each funding round issues new shares and shrinks your slice. Two more rounds typically dilutes you 20–40%."
             onChange={(expectedDilution) =>
               dispatch({ type: 'setEquity', equity: { ...equity, expectedDilution } })
             }
@@ -379,10 +352,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             max={100}
             value={equity.strongMultiple}
             help="Used only for the optimistic scenario. Default 3×."
-            why="An editorial judgment, not a finding: 3× the last round is a good outcome that
-                 happens often enough to be worth planning around, where a 50× outcome is a
-                 lottery ticket. Change it if you have a specific reason — it moves only the top
-                 row of the range."
+            why="3× the last round is a good, realistic outcome; 50× is a lottery ticket. This only changes the top of the range."
             onChange={(strongMultiple) =>
               dispatch({ type: 'setEquity', equity: { ...equity, strongMultiple } })
             }
@@ -402,9 +372,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
               })),
             ]}
             help="Used only to pick a liquidity probability, and only if you have not entered one."
-            why="Later-stage companies exit more often, and the observed rates are the one sourced
-                 figure in this section — everything else here is a judgment. Stage is not a
-                 guarantee in either direction: plenty of Series D companies have gone to zero."
+            why="Later-stage companies exit more often. These rates are sourced; the other inputs here are judgment calls."
             onChange={(stage) =>
               dispatch({
                 type: 'setEquity',
@@ -450,10 +418,7 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             label="Show the probability-weighted figure"
             checked={equity.showExpectedValue}
             help="Off by default. It never enters the headline either way."
-            why="Multiplying the middle outcome by the chance of any exit gives a mathematically
-                 defensible average that describes nobody's actual year: you do not get the average
-                 of many outcomes, you get one. It is useful for comparing two offers and
-                 misleading as a figure to plan around, which is why it is opt-in."
+            why="A probability-weighted average. Useful for comparing offers, but you get one outcome, not the average, so it is off by default."
             onChange={(showExpectedValue) =>
               dispatch({ type: 'setEquity', equity: { ...equity, showExpectedValue } })
             }

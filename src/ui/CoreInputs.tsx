@@ -62,9 +62,7 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
           id="base-salary"
           label="Base salary"
           help="Gross annual salary, before tax and before any deductions."
-          why="This is the only number most people compare offers on, and on its own it is the
-               least informative one here. It sets the anchor the rest of the page corrects:
-               salary divided by 2,080 hours."
+          why="The number most people compare offers on. Divided by 2,080 hours, it is the starting point this page corrects."
           value={cash.baseSalary}
           onChange={(baseSalary) => dispatch({ type: 'patchCash', patch: { baseSalary } })}
         />
@@ -75,10 +73,7 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
           unit="hours / week"
           help="What you actually work in a normal week, not what your contract says."
           max={168}
-          why="This is the denominator, and it is where most of the honesty in this app lives.
-               Two offers with identical pay are not equal if one of them takes fifteen more
-               hours a week — but a salary comparison cannot see that, because the salary is
-               the same either way."
+          why="Two jobs with the same salary are not equal if one takes more time."
           value={hours.hoursPerWeek}
           onChange={(hoursPerWeek) => dispatch({ type: 'patchHours', patch: { hoursPerWeek } })}
         />
@@ -90,10 +85,7 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
           help="Days of PTO or vacation per year. Under an unlimited policy, the days you
                 realistically take."
           max={365}
-          why="Paid time off is not extra money — your salary is the same whether you take five
-               days or twenty-five. What it actually buys you is fewer hours worked for that
-               same salary, so it raises your hourly rate from the bottom of the fraction. Adding
-               a dollar value for PTO on top of that would be counting it twice."
+          why="PTO is not extra money. It is fewer hours for the same salary, which raises your hourly rate."
           value={ptoDaysOf(hours.ptoPlan)}
           onChange={(days) =>
             dispatch({ type: 'setPtoPlan', ptoPlan: withPtoDays(hours.ptoPlan, days) })
@@ -106,9 +98,7 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
           unit="days / year"
           help="Paid public and company holidays per year."
           max={365}
-          why="Same mechanism as PTO: paid days you do not work. Worth listing separately
-               because holidays are easy to forget and there are usually ten or eleven of
-               them — two weeks of your year."
+          why="Paid days off, like PTO reduce your denominator."
           value={hours.holidayDays}
           onChange={(holidayDays) => dispatch({ type: 'patchHours', patch: { holidayDays } })}
         />

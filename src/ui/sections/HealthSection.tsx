@@ -52,11 +52,7 @@ export function HealthSection({ input, result, dispatch, mode }: InputSectionPro
         value={health.employerPremiumContribution}
         help="The employer's share of medical, dental and vision premiums, per year. Not the
               part deducted from your paycheck."
-        why="This is usually the largest number on the page that nobody counts. It is money
-             spent on you that never appears on a payslip, and because it is excluded from
-             income it is worth MORE than the same amount of salary — a $14,000 premium is
-             worth about $20,600 of pay at a 32% marginal rate. Ask HR for the figure; it is on
-             the benefits summary."
+        why="Often the biggest benefit nobody counts. It is tax-free, so a $14,000 premium is worth about $20,600 of salary at a 32% rate. Your benefits summary will list it."
         onChange={(employerPremiumContribution) =>
           dispatch({ type: 'patchHealth', patch: { employerPremiumContribution } })
         }
@@ -81,11 +77,7 @@ export function HealthSection({ input, result, dispatch, mode }: InputSectionPro
         label="Employer HSA contribution"
         value={health.employerHsaContribution}
         help={`Per year. Counted against the ${formatDollars(hsaLimit)} combined limit for your tier.`}
-        why="The best-treated dollar in the tax code: untaxed going in, untaxed while invested, and
-             untaxed coming out for medical costs. This app values it the same as a health
-             premium — grossed up by your marginal rate — which if anything understates it.
-             If the figure you enter would breach the statutory limit, the result panel says so
-             rather than silently using a smaller number."
+        why="Untaxed going in, while invested, and coming out for medical costs. Valued the same way as a health premium."
         onChange={(employerHsaContribution) =>
           dispatch({ type: 'patchHealth', patch: { employerHsaContribution } })
         }
@@ -96,9 +88,7 @@ export function HealthSection({ input, result, dispatch, mode }: InputSectionPro
         label="Employer FSA seed"
         value={health.employerFsaSeed}
         help="Employer money put into a flexible spending account, per year."
-        why="Employer seed money into an FSA is tax-free like a premium, with one catch the
-             arithmetic cannot see: FSA balances are use-it-or-lose-it within the plan year. The
-             dollars are real, but only if you spend them."
+        why="Tax-free like a premium, but use-it-or-lose-it each plan year."
         onChange={(employerFsaSeed) =>
           dispatch({ type: 'patchHealth', patch: { employerFsaSeed } })
         }
@@ -119,12 +109,9 @@ export function HealthSection({ input, result, dispatch, mode }: InputSectionPro
         label="Group life coverage amount"
         value={insurance.lifeCoverageAmount}
         help="The death benefit — often one or two times salary. Does not add to your total here."
-        why={`Collected because coverage above ${formatDollars(
+        why={`Coverage above ${formatDollars(
           LIMIT_GROUP_TERM_LIFE_TAX_FREE_COVERAGE
-        )} makes part of the premium taxable income to you, which is a detail most people have
-             never been told. This app counts the whole premium as tax-free and notes the
-             exception rather than modelling the imputed income, because the exact figure depends
-             on an IRS age table that would add precision the rest of these inputs cannot match.`}
+        )} makes part of the premium taxable. The app counts all of it as tax-free and notes the exception.`}
         onChange={(lifeCoverageAmount) =>
           dispatch({ type: 'patchInsurance', patch: { lifeCoverageAmount } })
         }
@@ -135,10 +122,7 @@ export function HealthSection({ input, result, dispatch, mode }: InputSectionPro
         label="Employer-paid disability premium"
         value={insurance.disabilityPremium}
         help="Short- and long-term disability premiums your employer pays, per year."
-        why="Worth more than it costs, and the one benefit here that is genuinely about risk
-             rather than money: individual long-term disability cover is expensive and often
-             medically underwritten, so an employer-paid group policy is cheaper than anything
-             you could buy and available to people who could not buy it at all."
+        why="Group disability coverage costs less than buying your own, and you get it even if you could not qualify on your own."
         onChange={(disabilityPremium) =>
           dispatch({ type: 'patchInsurance', patch: { disabilityPremium } })
         }

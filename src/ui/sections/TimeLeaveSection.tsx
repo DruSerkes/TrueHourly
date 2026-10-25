@@ -50,10 +50,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
           { value: 'unlimited', label: 'Unlimited / flexible' },
         ]}
         help="The hours arithmetic is identical either way. What changes is what happens when you leave."
-        why="Under an accrual plan an unused balance is money: most states require it to be paid
-             out when you leave, so it appears as a one-off note beside the result. Unlimited PTO
-             has no balance to pay out, which makes it worth strictly less than the accrual plan it
-             replaced — and the usual finding is that people take fewer days under it, not more."
+        why="Unused accrued PTO is usually paid out when you leave. Unlimited PTO has no balance to pay out."
         onChange={(type) =>
           dispatch({
             type: 'setPtoPlan',
@@ -77,9 +74,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
           max={365}
           value={plan.expectedAccruedBalanceDays}
           help="Used for the payout note only. It never enters the hourly rate."
-          why="An accrued balance is a genuine asset, but it is paid once, on separation — so
-               dividing it by the hours you work in a year would answer a question nobody asked.
-               It sits beside the result as a one-off figure instead."
+          why="Paid once when you leave, so it is shown as a separate one-time amount, not in your hourly rate."
           onChange={(expectedAccruedBalanceDays) =>
             dispatch({
               type: 'setPtoPlan',
@@ -107,10 +102,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
         max={365}
         value={hours.unpaidLeaveDays}
         help="Days off that you are not paid for."
-        why="Unpaid days cut both ways and the app only models one of them: they reduce the hours
-             you work, which raises the rate, but they also reduce the salary, which this field
-             does not touch. If you take a lot of unpaid leave, reduce the base salary to match —
-             otherwise the result is flattering."
+        why="Unpaid leave cuts your hours and your pay. Lower your base salary to match, or the result will be too high."
         onChange={(unpaidLeaveDays) => dispatch({ type: 'patchHours', patch: { unpaidLeaveDays } })}
       />
 
@@ -121,9 +113,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
         max={104}
         value={hours.sabbaticalWeeks}
         help="Paid sabbatical, in weeks. 0 if there is no programme."
-        why="A paid sabbatical is the same salary for fewer hours, so it belongs in the
-             denominator rather than being counted as extra compensation. Six weeks every five
-             years is 1.2 weeks off in every year you stay — which is how it is counted here."
+        why="Same salary, fewer hours. Six weeks every five years counts as 1.2 weeks off per year."
         onChange={(sabbaticalWeeks) => dispatch({ type: 'patchHours', patch: { sabbaticalWeeks } })}
       />
 
@@ -144,9 +134,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
         label="Enter my annual hours directly instead"
         checked={hours.hoursWorkedOverride !== null}
         help="Skips the arithmetic above and uses one figure you provide."
-        why="For anyone whose year does not decompose into weeks — contractors, shift work,
-             anybody tracking their own hours. The result panel marks the figure as overridden,
-             because a number nobody can check from the inputs shown should say so."
+        why="For hours that do not fit a weekly pattern. The result will be marked as overridden."
         onChange={(enabled) =>
           dispatch({
             type: 'patchHours',
@@ -178,11 +166,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
         max={600}
         value={hours.commuteMinutesOneWay}
         help="Collected but deliberately left out of the hourly rate."
-        why="Commuting is time the job takes and does not pay for, and there is a good argument
-             for putting it in the denominator. It is left out so that the headline stays
-             comparable between a remote job and an office one on the same basis everyone else
-             uses — and because a rate that silently included it would be impossible to check
-             against a payslip."
+        why="Not counted in your hours, so remote and office jobs compare on the same basis."
         onChange={(commuteMinutesOneWay) =>
           dispatch({ type: 'patchHours', patch: { commuteMinutesOneWay } })
         }
@@ -215,11 +199,7 @@ export function TimeLeaveSection({ input, result, dispatch, mode }: InputSection
         label="Count parental leave in the headline number"
         checked={leave.includeParentalLeaveInHeadline}
         help="Off by default. It appears as a note beside the result either way."
-        why="Unlike every other benefit here, this one is only worth anything in a year you
-             actually take it — and then it is worth a great deal. Averaging it across your whole
-             tenure would understate it in the year it matters and overstate it in every other, so
-             the app refuses to pick for you: leave it off to see your ordinary year, turn it on
-             to see the year you take leave."
+        why="Only matters in a year you take it. Turn it on to see that year; leave it off to see a typical year."
         onChange={(includeParentalLeaveInHeadline) =>
           dispatch({ type: 'patchLeave', patch: { includeParentalLeaveInHeadline } })
         }

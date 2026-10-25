@@ -216,7 +216,7 @@ describe('the tax assumption (DESIGN.md §2.2)', () => {
     const warning = taxWarnings(tax(0.32, 0.2)).find((w) => w.id === 'deferred-rate-raised');
 
     expect(warning?.severity).toBe('info');
-    expect(warning?.message).toContain('59.5');
+    expect(warning?.message).toContain('59½');
   });
 
   it('reaches the result through calculate, not just the helper', () => {

@@ -1,13 +1,3 @@
-/**
- * The disclaimer, and the privacy claim restated where someone looking for it
- * would go.
- *
- * The disclaimer is not boilerplate here. This app produces a dollar figure
- * about someone's pay from a single marginal rate they typed, and the gap
- * between "a useful way to compare two offers" and "a tax calculation" is
- * exactly the gap a person about to resign should not misjudge.
- */
-
 export function Footer() {
   return (
     <footer className="border-t border-line bg-surface">
@@ -21,7 +11,7 @@ export function Footer() {
           States. Check anything that matters with someone qualified, and check the benefit figures
           themselves against your own plan documents.
         </p>
-        <p>
+        <p className="mb-8 lg:mb-0">
           <strong className="text-ink">Your numbers stay here.</strong> Everything is calculated in
           your browser. Your inputs are saved only in this browser&rsquo;s local storage so the page
           remembers them when you come back, and they are never uploaded, logged or sent anywhere —

@@ -47,8 +47,7 @@ export function CashSection({ input, result, dispatch, mode }: InputSectionProps
         max={1}
         value={cash.bonusTargetPct}
         help="As a percentage of base salary. 10% of a $180,000 base is $18,000."
-        why="Stated as a percentage because that is how bonus plans are written, and because it
-             keeps the figure correct when you change the salary above to compare two offers."
+        why="Entered as a percentage so it stays correct when you change the salary."
         onChange={(bonusTargetPct) => dispatch({ type: 'patchCash', patch: { bonusTargetPct } })}
       />
 
@@ -61,12 +60,7 @@ export function CashSection({ input, result, dispatch, mode }: InputSectionProps
           { value: 'earned', label: 'Money I expect to be paid' },
         ]}
         help="Changes how the bonus is labelled, never how much it is worth."
-        why="A target bonus is real money if it is hit, and nothing if it is not — so it is
-             marked as an estimate, which makes it render distinctly in the breakdown and counts
-             towards the warning about how much of your package is estimated. If yours is
-             contractual, already declared, or has always paid in full, say so and it is treated
-             as pay you can bank on. The app cannot tell these apart by looking, so it asks
-             rather than guessing."
+        why="A target bonus only counts if it pays out, so it is marked as an estimate. If yours is guaranteed, say so."
         onChange={(bonusTreatment) => dispatch({ type: 'patchCash', patch: { bonusTreatment } })}
       />
 
@@ -75,9 +69,7 @@ export function CashSection({ input, result, dispatch, mode }: InputSectionProps
         label="Sign-on bonus"
         value={cash.signOnBonus}
         help="Paid once, usually in the first month or two."
-        why="A $40,000 sign-on is not $40,000 a year, so it is divided by the years you expect to
-             stay. That makes the same bonus worth twice as much per hour to someone leaving in
-             two years as to someone staying four — which is why the next field matters."
+        why="Spread over the years you expect to stay: $40,000 is $20,000 a year over two years, or $10,000 over four."
         onChange={(signOnBonus) => dispatch({ type: 'patchCash', patch: { signOnBonus } })}
       />
 
@@ -101,10 +93,7 @@ export function CashSection({ input, result, dispatch, mode }: InputSectionProps
         max={120}
         value={cash.signOnClawbackMonths}
         help="How long you would have to repay the sign-on if you left. 0 if there is no clawback."
-        why="Money you can be made to give back is not quite money you have. This does not change
-             the arithmetic — you did receive it — but if the clawback window outlasts how long
-             you expect to stay, the result panel says so, because that combination means you are
-             counting a bonus you may have to repay."
+        why="If the clawback period is longer than you plan to stay, you may have to pay it back."
         onChange={(signOnClawbackMonths) =>
           dispatch({ type: 'patchCash', patch: { signOnClawbackMonths } })
         }

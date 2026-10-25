@@ -89,22 +89,13 @@ export default function App() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto max-w-5xl px-4 py-5">
           <h1 className="text-2xl font-bold tracking-tight text-ink">True Hourly</h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-            What you actually earn per hour, once employer-paid benefits and the hours you really
-            work are both in the arithmetic.
-          </p>
-          <p className="mt-2 text-xs text-ink-faint">
-            Everything runs in your browser. Your inputs are saved in this browser only and are
-            never sent anywhere — there is no server to send them to.
-            {restored && ' Numbers below were restored from your last visit.'}
-          </p>
+          <p className="mt-1 max-w-2xl text-sm text-ink-muted">What you actually earn per hour</p>
         </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl grow gap-6 px-4 py-6 pb-28 lg:grid-cols-12 lg:pb-6">
         <div className="min-w-0 lg:col-span-6">
-          <HowThisWorks />
-          <div className="mt-6">
+          <div>
             <CoreInputs input={input} dispatch={dispatch} />
           </div>
           <InputSections input={input} result={result} dispatch={dispatch} mode={mode} />
@@ -118,6 +109,10 @@ export default function App() {
             mode={mode}
             onModeChange={setMode}
           />
+
+          <div className="mt-4 ">
+            <HowThisWorks />
+          </div>
         </div>
       </main>
 

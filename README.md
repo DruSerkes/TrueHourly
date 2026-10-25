@@ -60,11 +60,6 @@ pnpm deploy                      # builds, then wrangler pages deploy dist
 command is written as `npm run build` there because that is what the Pages build image runs by
 default; it does the same thing as `pnpm build`.
 
-`public/_headers` ships the response headers, including a Content-Security-Policy with
-`connect-src 'none'`. That is deliberate: the privacy claim on the front page is enforced by the
-browser, not just by the code, so any future attempt to make a network call with someone's salary
-in it fails loudly instead of quietly working.
-
 ## Architecture
 
 The split that matters is **engine / UI**, and it is enforced rather than conventional.

@@ -47,10 +47,7 @@ export function RetirementSection({ input, result, dispatch, mode }: InputSectio
         label="Employer 401(k) match"
         help="Dollars per year your employer puts in, or the percentage of salary your plan
               states. Not your own contribution."
-        why="Free money, but not the same kind of money as salary: you cannot spend it until 59½
-             and it is taxed as ordinary income when you do. So this app counts it at face value
-             and deliberately does not treat it as tax-free — inflating it would be the sort of
-             error that discredits the whole number."
+        why="Counted at face value, not as tax-free: you cannot touch it until 59½, and it is taxed when you withdraw it."
         match={match}
         baseSalary={cash.baseSalary}
         onChange={(employerMatch) => dispatch({ type: 'setEmployerMatch', employerMatch })}
@@ -105,9 +102,7 @@ export function RetirementSection({ input, result, dispatch, mode }: InputSectio
         max={10}
         value={retirement.matchVestingYears}
         help="0 if it is yours immediately."
-        why="An unvested match is a promise, not a balance. If you leave before the cliff you
-             keep none of it, so the result panel flags the combination rather than quietly
-             counting money that is conditional on a date you have not reached."
+        why="If you leave before the match vests, you lose it. The result panel flags this."
         onChange={(matchVestingYears) =>
           dispatch({ type: 'patchRetirement', patch: { matchVestingYears } })
         }
@@ -128,10 +123,7 @@ export function RetirementSection({ input, result, dispatch, mode }: InputSectio
         label="Student-loan repayment match"
         value={retirement.studentLoanMatch}
         help="Employer retirement contributions matched against your student-loan payments."
-        why="A newer benefit: your employer treats your loan payments as if they were 401(k)
-             contributions and matches them. It is worth the same as an ordinary match and is
-             counted the same way — at face value, because it lands in a retirement account
-             rather than in your pocket."
+        why="Your employer matches student loan payments as if they were 401(k) contributions. Counted like a regular match."
         onChange={(studentLoanMatch) =>
           dispatch({ type: 'patchRetirement', patch: { studentLoanMatch } })
         }
@@ -154,9 +146,7 @@ export function RetirementSection({ input, result, dispatch, mode }: InputSectio
             label="Your annual ESPP contribution"
             value={espp.annualContribution}
             help="Deducted from your own pay — the benefit is the discount on it, not the amount."
-            why="Only the discount counts as compensation here. If you put in $10,000 at a 15%
-                 discount you receive about $11,765 of stock, so the benefit is the $1,765 of
-                 gain, not the $10,000 that was already yours."
+            why="Only the discount counts. $10,000 at a 15% discount buys about $11,765 of stock, a $1,765 gain."
             onChange={(annualContribution) =>
               dispatch({
                 type: 'patchRetirement',
@@ -181,10 +171,7 @@ export function RetirementSection({ input, result, dispatch, mode }: InputSectio
             label="The plan has a lookback provision"
             checked={espp.hasLookback}
             help="The discount applies to the lower of the price at the start and end of the period."
-            why="A lookback makes an ESPP worth materially more than the plain discount, and this
-                 app does not try to price it — that needs a share-price history it does not have.
-                 Ticking this adds a note saying the figure is an understatement, which is the
-                 honest treatment of a benefit that cannot be valued here."
+            why="A lookback makes an ESPP worth more, but valuing it needs price history. Checking this adds a note that the figure is too low."
             onChange={(hasLookback) =>
               dispatch({ type: 'patchRetirement', patch: { espp: { ...espp, hasLookback } } })
             }
