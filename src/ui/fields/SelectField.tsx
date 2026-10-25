@@ -1,6 +1,6 @@
 /**
  * A labelled `<select>` for the input's enum-shaped fields — PTO plan type,
- * coverage tier, equity mode, option class, funding stage, stipend treatment.
+ * coverage tier, equity mode, option class, stipend treatment.
  *
  * A native select rather than a styled listbox, deliberately. Every one of
  * these is a short list of mutually exclusive options with no need for search,

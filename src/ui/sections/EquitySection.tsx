@@ -12,16 +12,16 @@
  * ── Private is the point ────────────────────────────────────────────────
  *
  * For a private grant the headline counts $0 and the value appears as a
- * labelled range, with four adjustable assumptions and an explanation of each.
+ * labelled range, with three adjustable assumptions and an explanation of each.
  * The explanations are not decoration: a user who does not know that common
  * stock sits behind the preferred stack has no way to judge whether a 30%
  * discount is right for their company, and the whole exercise is worthless if
  * the haircuts are taken on faith. See `EquityScenarioPanel`.
  */
 
-import { DEFAULT_VEST_YEARS, LIQUIDITY_PROBABILITY_BY_STAGE } from '../../engine/constants.ts';
+import { DEFAULT_VEST_YEARS } from '../../engine/constants.ts';
 import { PRIVATE_EQUITY_ASSUMPTION_DEFAULTS } from '../../engine/equity.ts';
-import type { EquityInput, FundingStage } from '../../engine/types.ts';
+import type { EquityInput } from '../../engine/types.ts';
 import { EquityScenarioPanel } from '../EquityScenarioPanel.tsx';
 import { Section } from '../Section.tsx';
 import { sumCategories } from '../contributions.ts';
@@ -29,20 +29,8 @@ import { CurrencyField } from '../fields/CurrencyField.tsx';
 import { NumberField } from '../fields/NumberField.tsx';
 import { RateField } from '../fields/RateField.tsx';
 import { SelectField } from '../fields/SelectField.tsx';
-import { ToggleField } from '../fields/ToggleField.tsx';
-import { formatDollars, formatPercent } from '../format.ts';
+import { formatDollars } from '../format.ts';
 import type { InputSectionProps } from './props.ts';
-
-/** `null` is a real answer here, so it needs a value the `<select>` can hold. */
-const UNSPECIFIED = 'unspecified';
-
-const STAGE_LABELS: Record<FundingStage, string> = {
-  seed: 'Seed',
-  series_a: 'Series A',
-  series_b: 'Series B',
-  series_c: 'Series C',
-  series_d_plus: 'Series D or later',
-};
 
 const MODE_LABELS: Record<EquityInput['type'], string> = {
   none: 'No equity',
@@ -90,7 +78,6 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
                   lastPreferredPricePerShare: 0,
                   vestYears,
                   cliffMonths,
-                  showExpectedValue: false,
                   ...PRIVATE_EQUITY_ASSUMPTION_DEFAULTS,
                 };
 
@@ -355,72 +342,6 @@ export function EquitySection({ input, result, dispatch, mode }: InputSectionPro
             why="3× the last round is a good, realistic outcome; 50× is a lottery ticket. This only changes the top of the range."
             onChange={(strongMultiple) =>
               dispatch({ type: 'setEquity', equity: { ...equity, strongMultiple } })
-            }
-          />
-
-          <SelectField
-            id="funding-stage"
-            label="Funding stage when you were granted"
-            value={equity.stage ?? UNSPECIFIED}
-            options={[
-              { value: UNSPECIFIED, label: 'Not sure' },
-              ...(Object.keys(STAGE_LABELS) as FundingStage[]).map((stage) => ({
-                value: stage,
-                label: `${STAGE_LABELS[stage]} — ${formatPercent(
-                  LIQUIDITY_PROBABILITY_BY_STAGE[stage]
-                )} reach liquidity`,
-              })),
-            ]}
-            help="Used only to pick a liquidity probability, and only if you have not entered one."
-            why="Later-stage companies exit more often. These rates are sourced; the other inputs here are judgment calls."
-            onChange={(stage) =>
-              dispatch({
-                type: 'setEquity',
-                equity: {
-                  ...equity,
-                  stage: stage === UNSPECIFIED ? null : (stage as FundingStage),
-                },
-              })
-            }
-          />
-
-          <ToggleField
-            id="liquidity-own"
-            label="I want to set the liquidity probability myself"
-            checked={equity.liquidityProbability !== null}
-            help="Otherwise it comes from the funding stage above, or from a conservative default."
-            onChange={(own) =>
-              dispatch({
-                type: 'setEquity',
-                // `null` means "derive it" and `0` means "this will never exit",
-                // which is why this is a toggle and not a field where 0 stands
-                // in for no answer.
-                equity: { ...equity, liquidityProbability: own ? 0.2 : null },
-              })
-            }
-          />
-
-          {equity.liquidityProbability !== null && (
-            <RateField
-              id="liquidity-probability"
-              label="Chance of any liquidity event"
-              max={1}
-              value={equity.liquidityProbability}
-              help="An acquisition or IPO at any price. 0% is a legitimate answer."
-              onChange={(liquidityProbability) =>
-                dispatch({ type: 'setEquity', equity: { ...equity, liquidityProbability } })
-              }
-            />
-          )}
-
-          <ToggleField
-            id="show-expected-value"
-            label="Show the probability-weighted figure"
-            checked={equity.showExpectedValue}
-            help="Off by default. It never enters the headline either way."
-            why="A probability-weighted average. Useful for comparing offers, but you get one outcome, not the average, so it is off by default."
-            onChange={(showExpectedValue) =>
-              dispatch({ type: 'setEquity', equity: { ...equity, showExpectedValue } })
             }
           />
 

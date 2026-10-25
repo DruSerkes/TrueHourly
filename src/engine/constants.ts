@@ -19,8 +19,6 @@
  * All money is whole dollars; all rates are decimals.
  */
 
-import type { FundingStage } from './types.ts';
-
 // ===========================================================================
 // § 2026 statutory limits
 // ===========================================================================
@@ -277,53 +275,6 @@ export const DEFAULT_EXPECTED_DILUTION = 0.25;
  * ASSUMPTION — a good-but-not-extraordinary outcome.
  */
 export const DEFAULT_STRONG_MULTIPLE = 3;
-
-/**
- * Probability of any liquidity event by funding stage at the time of the grant,
- * decimal.
- *
- * SOURCED, not invented — which makes this the one block in the "App defaults"
- * section that is not purely an assumption. The figures come from a study of
- * startup exit outcomes by funding stage: later-stage companies have already
- * survived the filters that kill earlier ones, so the observed exit rate climbs
- * monotonically.
- *
- * Still not a statutory fact, which is why it lives here rather than above:
- * it is a secondary source summarizing an empirical distribution, the
- * underlying population is not fully specified, and "exit" is doing some work
- * (an acqui-hire and a tenfold IPO are both exits, and only one of them makes
- * an option grant worth anything). Treat it as a better-grounded default than a
- * round number, not as a prediction about any particular company. Every value
- * stays user-overridable via `PrivateEquity.liquidityProbability`.
- *
- * https://www.zabella.net/blog/startup-exit-statistics
- * TODO: find the primary dataset behind this summary and cite it directly
- */
-export const LIQUIDITY_PROBABILITY_BY_STAGE: Readonly<Record<FundingStage, number>> = {
-  seed: 0.13,
-  series_a: 0.19,
-  series_b: 0.25,
-  series_c: 0.33,
-  series_d_plus: 0.39,
-};
-
-/**
- * Fallback probability of a liquidity event when the user has not told us what
- * stage the company is at, decimal. ASSUMPTION.
- *
- * 0.20 rather than the midpoint of the table above, because **most startups
- * fail.** Earlier-stage companies carry materially higher risk, and the base
- * rate across all startups sits nearer the bottom of that table than its
- * middle. With the stage unknown, the defensible default is the conservative
- * one: it sits between the seed and Series B figures, so it is wrong in a
- * knowable direction rather than flattering by default.
- *
- * This is a statement about startup survival, not about which users answer the
- * stage question. Overstating the probability makes a worthless grant look like
- * compensation, which is the error this app exists to correct; understating it
- * makes the headline a floor, which is the error it can live with.
- */
-export const DEFAULT_LIQUIDITY_PROBABILITY = 0.2;
 
 // --- ESPP -----------------------------------------------------------------
 

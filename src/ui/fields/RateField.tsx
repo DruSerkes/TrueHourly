@@ -39,7 +39,7 @@ export interface RateFieldProps {
   presets?: readonly number[];
   /**
    * Ceiling as a decimal. Defaults to `MAX_TAX_RATE`, which is what this field
-   * was built for; the equity haircuts and the liquidity probability pass `1`,
+   * was built for; the equity haircuts pass `1`,
    * where every value up to certainty is meaningful.
    */
   max?: number;

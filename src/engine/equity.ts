@@ -28,9 +28,7 @@
 import {
   DEFAULT_COMMON_DISCOUNT,
   DEFAULT_EXPECTED_DILUTION,
-  DEFAULT_LIQUIDITY_PROBABILITY,
   DEFAULT_STRONG_MULTIPLE,
-  LIQUIDITY_PROBABILITY_BY_STAGE,
   MIN_VEST_YEARS,
 } from './constants.ts';
 import { clamp, dollars, nonNegative } from './numbers.ts';
@@ -53,41 +51,6 @@ import type {
   PublicEquity,
   Warning,
 } from './types.ts';
-
-/**
- * The liquidity probability to use, and where it came from.
- *
- * Three tiers, most specific first:
- *
- *   1. a probability the user typed — they know their company better than a
- *      table does, and `0` is a legitimate answer meaning "this will never
- *      exit", which is why the field is `number | null` and not just `number`
- *   2. the observed rate for the company's funding stage
- *      (`LIQUIDITY_PROBABILITY_BY_STAGE`) — sourced, not invented
- *   3. `DEFAULT_LIQUIDITY_PROBABILITY`, deliberately pitched low because most
- *      startups fail and the base rate across all of them sits nearer the
- *      bottom of the stage table than its middle
- *
- * The basis travels with the number so the UI can say "19%, the observed rate
- * for Series A" rather than presenting a sourced figure, a user's guess, and a
- * fallback as though they were the same kind of claim (invariant 6).
- */
-export function resolveLiquidityProbability(equity: PrivateEquity): {
-  probability: number;
-  basis: EquityScenarios['liquidityProbabilityBasis'];
-} {
-  const entered = equity.liquidityProbability;
-  if (entered !== null) return { probability: clamp(entered, 0, 1), basis: 'entered' };
-
-  if (equity.stage !== null) {
-    const byStage = LIQUIDITY_PROBABILITY_BY_STAGE[equity.stage];
-    // Guarded because a restored save or a hand-edited URL can hold a stage
-    // string that is no longer in the table.
-    if (byStage !== undefined) return { probability: byStage, basis: 'stage' };
-  }
-
-  return { probability: DEFAULT_LIQUIDITY_PROBABILITY, basis: 'default' };
-}
 
 /**
  * Years to spread a grant over, floored at `MIN_VEST_YEARS`.
@@ -169,29 +132,20 @@ function publicEquity(equity: PublicEquity): EquityContribution {
  *     diluted = common × (1 − expectedDilution)
  *     perYear = diluted / vestYears
  *
- * Each of the four assumptions is a user-adjustable input defaulting to a
+ * Each of the three assumptions is a user-adjustable input defaulting to a
  * figure in `constants.ts`, and every one is echoed back in
  * `scenarios.assumptions` so the UI can show its work without reaching into the
  * input. They are labelled assumptions, not facts — the `strongMultiple` of 3
- * and the fallback `liquidityProbability` in particular are editorial
- * judgments. The stage-based probabilities are the one sourced figure in the
- * set — see `LIQUIDITY_PROBABILITY_BY_STAGE`.
+ * in particular is an editorial judgment.
  *
  * Rates are clamped to `[0, 1]`: a discount above 1 flips the sign and turns a
  * worthless grant into a positive number, which is the one failure mode that
  * would make this module actively misleading rather than merely uncertain.
- *
- * `expectedValue` is **0 unless `showExpectedValue` is set**. DESIGN.md §2.4
- * says it is shown "only when the user opts in", and enforcing that here rather
- * than in the UI means the opt-in cannot be lost to a forgotten `if` in a
- * component that does not exist yet. The probability behind it is resolved by
- * `resolveLiquidityProbability` and reported with its provenance.
  */
 export function privateEquityScenarios(equity: PrivateEquity): EquityScenarios {
   const commonDiscount = clamp(equity.commonDiscount, 0, 1);
   const expectedDilution = clamp(equity.expectedDilution, 0, 1);
   const strongMultiple = nonNegative(equity.strongMultiple);
-  const { probability: liquidityProbability, basis } = resolveLiquidityProbability(equity);
 
   const preferredValue =
     nonNegative(equity.grantShares) * nonNegative(equity.lastPreferredPricePerShare);
@@ -203,15 +157,10 @@ export function privateEquityScenarios(equity: PrivateEquity): EquityScenarios {
     zero: 0,
     modest: perYear,
     strong: perYear * strongMultiple,
-    expectedValue: equity.showExpectedValue ? perYear * liquidityProbability : 0,
-    liquidityProbabilityBasis: basis,
-    // Echoed back whether or not `expectedValue` is shown: the UI needs the
-    // figure to label the opt-in itself ("show expected value at 19%").
     assumptions: {
       commonDiscount,
       expectedDilution,
       strongMultiple,
-      liquidityProbability,
       vestYears: vestingYears(equity.vestYears),
     },
   };
@@ -355,10 +304,4 @@ export const PRIVATE_EQUITY_ASSUMPTION_DEFAULTS = {
   commonDiscount: DEFAULT_COMMON_DISCOUNT,
   expectedDilution: DEFAULT_EXPECTED_DILUTION,
   strongMultiple: DEFAULT_STRONG_MULTIPLE,
-  // `null`, not the fallback figure: a new input has made no claim about the
-  // probability, and seeding it with a number would make an untouched form look
-  // like a user who had chosen 20%. `resolveLiquidityProbability` supplies the
-  // fallback at the point of use, and reports that it did.
-  liquidityProbability: null,
-  stage: null,
 } as const;

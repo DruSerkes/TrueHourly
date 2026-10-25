@@ -15,25 +15,16 @@
  *
  * So the panel shows its work. Every haircut is a user-adjustable assumption
  * with a plain-language explanation, the chain from grant to per-year figure is
- * spelled out, and the one genuinely shaky figure — probability-weighted
- * expected value — is behind an opt-in the engine enforces rather than the UI
- * (see `privateEquityScenarios`).
+ * spelled out.
  */
 
 import type { EquityScenarios, PrivateEquity } from '../engine/types.ts';
-import { ConfidenceBadge } from './ConfidenceBadge.tsx';
 import { formatDollars, formatPercent, formatPerShare } from './format.ts';
 
 export interface EquityScenarioPanelProps {
   equity: PrivateEquity;
   scenarios: EquityScenarios;
 }
-
-const BASIS_LABEL: Record<EquityScenarios['liquidityProbabilityBasis'], string> = {
-  entered: 'your own figure',
-  stage: 'the observed rate for this funding stage',
-  default: 'the default across all startups',
-};
 
 export function EquityScenarioPanel({ equity, scenarios }: EquityScenarioPanelProps) {
   // `assumptions` is a `Record<string, number>` so the engine can echo back
@@ -45,7 +36,6 @@ export function EquityScenarioPanel({ equity, scenarios }: EquityScenarioPanelPr
     commonDiscount = 0,
     expectedDilution = 0,
     strongMultiple = 1,
-    liquidityProbability = 0,
     vestYears = 1,
   } = scenarios.assumptions;
 
@@ -94,26 +84,6 @@ export function EquityScenarioPanel({ equity, scenarios }: EquityScenarioPanelPr
             <p className="text-xs text-ink-faint">{row.blurb}</p>
           </div>
         ))}
-
-        {equity.showExpectedValue && (
-          <div className="border-t border-line pt-2">
-            <div className="flex items-baseline justify-between gap-3">
-              <dt className="text-sm font-medium text-ink">
-                Probability-weighted
-                <ConfidenceBadge confidence="estimated" />
-              </dt>
-              <dd className="text-base font-semibold text-ink tabular-nums">
-                {formatDollars(scenarios.expectedValue)}
-              </dd>
-            </div>
-            <p className="text-xs text-ink-faint">
-              The middle outcome multiplied by a {formatPercent(liquidityProbability)} chance of any
-              liquidity event — {BASIS_LABEL[scenarios.liquidityProbabilityBasis]}. This is the
-              shakiest figure on the page: it describes the average of many outcomes, and you only
-              get one.
-            </p>
-          </div>
-        )}
       </dl>
 
       {/* The chain, stated. A range nobody can reconstruct is a range nobody

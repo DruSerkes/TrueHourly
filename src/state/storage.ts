@@ -138,19 +138,15 @@ function isEquity(value: unknown): boolean {
     case 'public':
       return hasNumbers(value, ['grantShares', 'pricePerShare', 'vestYears', 'cliffMonths']);
     case 'private':
-      return (
-        hasNumbers(value, [
-          'grantShares',
-          'lastPreferredPricePerShare',
-          'vestYears',
-          'cliffMonths',
-          'commonDiscount',
-          'expectedDilution',
-          'strongMultiple',
-        ]) &&
-        isNumberOrNull(value.liquidityProbability) &&
-        typeof value.showExpectedValue === 'boolean'
-      );
+      return hasNumbers(value, [
+        'grantShares',
+        'lastPreferredPricePerShare',
+        'vestYears',
+        'cliffMonths',
+        'commonDiscount',
+        'expectedDilution',
+        'strongMultiple',
+      ]);
     case 'options':
       return hasNumbers(value, [
         'grantShares',
@@ -176,7 +172,7 @@ function isEspp(value: unknown): boolean {
  * The cast at the end is the one unchecked step in the file, and it is narrowed
  * to what the engine actually consumes: every numeric leaf it divides by or
  * sums has been verified above. String-typed enum fields (`bonusTreatment`,
- * `coverageTier`, `stipendTaxTreatment`, `optionClass`, `stage`) are
+ * `coverageTier`, `stipendTaxTreatment`, `optionClass`) are
  * deliberately not checked, because each is read through an equality test in
  * the engine — `=== 'earned'`, `=== 'family'` — so an unrecognized value lands
  * on the documented default instead of propagating. A bad *number* is the only

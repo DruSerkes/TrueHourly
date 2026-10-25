@@ -182,50 +182,13 @@ scenarios = {
   modest: perYear,                    // exit at roughly the last round's valuation
   strong: perYear × strongMultiple,
 }
-expectedValue = showExpectedValue
-                  ? perYear × liquidityProbability
-                  : 0                              // opt-in enforced in the ENGINE
 ```
 
 Defaults, all user-adjustable and **labelled as assumptions, not facts**:
 `commonDiscount = 0.30`, `expectedDilution = 0.25`, `strongMultiple = 3`.
 
-**`expectedValue` is zeroed by the engine, not hidden by the UI.** It is the shakiest figure
-the app can produce, and an opt-in guarded only by a conditional in a component is not an
-opt-in. The probability behind it is still reported in `assumptions` while the value is
-hidden, so the UI can label the toggle itself ("show expected value at 20%").
-
-**`liquidityProbability` has three sources**, most specific first, and the one used is
-reported in `scenarios.liquidityProbabilityBasis` so the UI can say which:
-
-| Basis     | Source                                                    |
-| --------- | --------------------------------------------------------- |
-| `entered` | the user typed a probability (`0` is a real answer)       |
-| `stage`   | observed exit rate for the company's funding stage        |
-| `default` | neither given → `0.20`                                    |
-
-The stage table is **sourced, not invented** — the one figure in the private-equity model
-that is not purely editorial:
-
-| Stage at grant | Probability of any exit |
-| -------------- | ----------------------- |
-| Seed           | 13%                     |
-| Series A       | 19%                     |
-| Series B       | 25%                     |
-| Series C       | 33%                     |
-| Series D+      | 39%                     |
-
-It rises monotonically because later-stage companies have already survived the filters that
-kill earlier ones. Caveats that keep it a default rather than a prediction: it is a secondary
-source, the underlying population is not fully specified, and "exit" covers both an
-acqui-hire and a tenfold IPO — only one of which makes a grant worth anything.
-
-The `0.20` fallback is deliberately **below** the midpoint of that table, because most
-startups fail. Earlier-stage companies carry materially higher risk, and the base rate across
-all startups sits nearer the bottom of that table than its middle — so with the stage unknown,
-the conservative figure is the defensible one. Overstating the probability makes a worthless
-grant look like compensation, which is the error this app exists to correct; understating it
-makes the headline a floor, which is the error it can live with.
+There is deliberately **no probability-weighted figure**. One was built and then removed at
+the owner's request (DECISIONS.md, 2026-10-24). The three scenarios are the whole output.
 
 The headline uses `zero`. The UI shows the range with a plain-language explanation of each
 haircut. This is the single most distinctive thing in the app — it is the honest answer to
@@ -306,18 +269,10 @@ interface EquityScenarios {
   zero: number;
   modest: number;
   strong: number;
-  expectedValue: number; // 0 unless showExpectedValue — see §2.4
-  liquidityProbabilityBasis: "entered" | "stage" | "default";
   assumptions: Record<string, number>;
 }
 
 type BonusTreatment = "target" | "earned"; // §2.3 note 3
-type FundingStage =
-  | "seed"
-  | "series_a"
-  | "series_b"
-  | "series_c"
-  | "series_d_plus";
 
 interface Warning {
   id: string;
@@ -529,8 +484,5 @@ Six Claude Code sessions, each ending green and committable. See `session-prompt
 - [Venable — 2026 IRS Dollar Limits on Benefits and Contributions](https://www.venable.com/insights/publications/2025/11/2026-irs-dollar-limits-on-benefits-contributions)
 - [Benefit Resource — 2026 Plan Limits](https://www.benefitresource.com/resources/plan-limits/)
 - [Namely — Does Your PTO Plan Type Even Really Matter?](https://namely.com/blog/does-your-pto-plan-type-even-really-matter/)
-- [Zabella — Startup exit statistics](https://www.zabella.net/blog/startup-exit-statistics) —
-  exit probability by funding stage (§2.4). Secondary source; the primary dataset is still to
-  be tracked down.
 - [Clockify — PTO Statistics](https://clockify.me/pto-statistics)
 - [Cloudflare — Migrate from Pages to Workers](https://developers.cloudflare.com/workers/static-assets/migration-guides/migrate-from-pages/)

@@ -1349,3 +1349,28 @@ amounts and confidence unchanged. The vesting note no longer repeats "your own
 contributions are always 100% vested", because the `match-vesting-cliff` warning
 already says it. The severance note no longer says "not counted above", because
 the section subheading in `NoteCards.tsx` already says that for every card.
+
+## 2026-10-24 — Probability-weighted private-equity figure removed
+
+Removed at the owner's request. Everything that existed only to feed it went too:
+
+- Input: `PrivateEquity.showExpectedValue`, `.liquidityProbability`, `.stage`, and the
+  `FundingStage` type.
+- Result: `EquityScenarios.expectedValue`, `.liquidityProbabilityBasis`, and
+  `assumptions.liquidityProbability`.
+- Engine: `resolveLiquidityProbability`, `LIQUIDITY_PROBABILITY_BY_STAGE`,
+  `DEFAULT_LIQUIDITY_PROBABILITY`, and the Zabella source citation.
+- UI: the funding-stage select, the "set it myself" toggle, the probability field, the
+  "show" toggle, and the panel row.
+
+The private model is now three scenarios (zero / modest / strong) built from three
+assumptions.
+
+**Saved data:** `STORAGE_VERSION` was deliberately not bumped. Old saves still carry the
+three removed fields. The guard ignores keys it does not check, so those saves still load
+and the fields sit there unread until the user next switches equity mode. Bumping the
+version would have wiped every saved form over three dead fields. A storage test pins this.
+
+**If it comes back:** the stage table (seed 13% → Series D+ 39%) came from a secondary
+source, https://www.zabella.net/blog/startup-exit-statistics, with the primary dataset
+never found. It is in git history at 99382b7.

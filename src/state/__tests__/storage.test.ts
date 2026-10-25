@@ -100,9 +100,6 @@ describe('saveInput / loadSavedInput round-trip', () => {
         commonDiscount: 0.3,
         expectedDilution: 0.25,
         strongMultiple: 3,
-        stage: 'series_b',
-        liquidityProbability: null,
-        showExpectedValue: true,
       },
     };
     input.retirement.employerMatch = {
@@ -286,9 +283,6 @@ describe('isSavedInput', () => {
         commonDiscount: 0.3,
         expectedDilution: 0.25,
         strongMultiple: 3,
-        stage: null,
-        liquidityProbability: null,
-        showExpectedValue: false,
       },
       {
         type: 'options',
@@ -303,6 +297,30 @@ describe('isSavedInput', () => {
     for (const equity of modes) {
       expect(isSavedInput(withInput((i) => (i.equity = equity))), equity.type).toBe(true);
     }
+  });
+
+  it('still accepts a private grant saved before the probability-weighted figure was removed', () => {
+    // Saves from before 2026-10-24 carry `stage`, `liquidityProbability` and
+    // `showExpectedValue`. They are inert now, and rejecting them would wipe
+    // the user's whole form over three fields nothing reads.
+    const legacy = withInput((i) =>
+      Object.assign(i, {
+        equity: {
+          type: 'private',
+          grantShares: 1,
+          lastPreferredPricePerShare: 1,
+          vestYears: 4,
+          cliffMonths: 12,
+          commonDiscount: 0.3,
+          expectedDilution: 0.25,
+          strongMultiple: 3,
+          stage: 'series_b',
+          liquidityProbability: null,
+          showExpectedValue: true,
+        },
+      })
+    );
+    expect(isSavedInput(legacy)).toBe(true);
   });
 
   it('rejects an unrecognized equity mode', () => {

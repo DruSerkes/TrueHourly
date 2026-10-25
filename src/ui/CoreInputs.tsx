@@ -51,18 +51,12 @@ export function CoreInputs({ input, dispatch }: CoreInputsProps) {
       <h2 className="text-lg font-semibold text-ink" id="your-package">
         Your package
       </h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        Four fields get you a number. The employer-paid money — your 401(k) match, health premium,
-        equity, perks — is in the sections below, and it is usually worth a quarter of a package.
-        Nothing leaves this browser.
-      </p>
 
       <div className={`${CARD} mt-3 divide-y divide-line`}>
         <CurrencyField
           id="base-salary"
           label="Base salary"
           help="Gross annual salary, before tax and before any deductions."
-          why="The number most people compare offers on. Divided by 2,080 hours, it is the starting point this page corrects."
           value={cash.baseSalary}
           onChange={(baseSalary) => dispatch({ type: 'patchCash', patch: { baseSalary } })}
         />

@@ -18,28 +18,20 @@
 
 import { describe, expect, it } from 'vitest';
 import { calculate } from '../calculate.ts';
-import { LIQUIDITY_PROBABILITY_BY_STAGE } from '../constants.ts';
 import {
   computeEquityItems,
   optionsIntrinsicPerYear,
   privateEquityScenarios,
   publicEquityPerYear,
-  resolveLiquidityProbability,
 } from '../equity.ts';
 import type {
   EquityInput,
-  FundingStage,
   LineItem,
   OptionsEquity,
   PrivateEquity,
   TrueHourlyResult,
 } from '../types.ts';
-import {
-  FALLBACK_LIQUIDITY_PROBABILITY,
-  PRIVATE_EQUITY_DEFAULTS,
-  defaultInput,
-  defaultTax,
-} from './_input.ts';
+import { PRIVATE_EQUITY_DEFAULTS, defaultInput, defaultTax } from './_input.ts';
 
 /** A package whose only compensation is equity, at t = 0.32. */
 function withEquity(equity: EquityInput): TrueHourlyResult {
@@ -62,7 +54,6 @@ function privateGrant(overrides: Partial<PrivateEquity> = {}): PrivateEquity {
     lastPreferredPricePerShare: 10,
     vestYears: 4,
     cliffMonths: 12,
-    showExpectedValue: false,
     ...PRIVATE_EQUITY_DEFAULTS,
     ...overrides,
   };
@@ -206,7 +197,6 @@ describe("equity.type === 'private' — the scenario model (DESIGN.md §2.4)", (
       commonDiscount: 0.3,
       expectedDilution: 0.25,
       strongMultiple: 3,
-      liquidityProbability: FALLBACK_LIQUIDITY_PROBABILITY,
       vestYears: 4,
     });
   });
@@ -267,137 +257,11 @@ describe("equity.type === 'private' — the scenario model (DESIGN.md §2.4)", (
       expect(bigger.modest).toBeCloseTo(scenarios.modest, 2);
     });
 
-    it('a higher liquidity probability raises only the expected value', () => {
-      const likelier = privateEquityScenarios(privateGrant({ liquidityProbability: 0.6 }));
-      expect(likelier.expectedValue).toBeCloseTo(scenarios.expectedValue * 2, 2);
-      expect(likelier.modest).toBeCloseTo(scenarios.modest, 2);
-    });
-
     it('a 100% discount leaves nothing, and does not go negative past it', () => {
       // Clamped at 1: a discount of 1.5 would otherwise flip the sign and turn
       // a worthless grant into a positive number.
       expect(modestWith({ commonDiscount: 1 })).toBe(0);
       expect(modestWith({ commonDiscount: 1.5 })).toBe(0);
-    });
-
-    it('a certain liquidity event makes expectedValue equal modest', () => {
-      const certain = privateEquityScenarios(
-        privateGrant({ liquidityProbability: 1, showExpectedValue: true })
-      );
-      expect(certain.expectedValue).toBeCloseTo(scenarios.modest, 2);
-    });
-  });
-
-  describe('expected value is opt-in (DESIGN.md §2.4)', () => {
-    // Enforced in the ENGINE, not left to the UI to hide. This is the shakiest
-    // figure the app can produce, and an opt-in guarded only by a forgotten
-    // `if` in a component is not an opt-in.
-    it('is 0 when the user has not opted in', () => {
-      expect(privateEquityScenarios(privateGrant({ showExpectedValue: false })).expectedValue).toBe(
-        0
-      );
-    });
-
-    it('is modest x probability once the user opts in', () => {
-      // 13,125 x the 0.20 fallback = 2,625
-      const shown = privateEquityScenarios(privateGrant({ showExpectedValue: true }));
-      expect(shown.expectedValue).toBeCloseTo(13_125 * FALLBACK_LIQUIDITY_PROBABILITY, 2);
-    });
-
-    it('sits between zero and modest once shown', () => {
-      const shown = privateEquityScenarios(privateGrant({ showExpectedValue: true }));
-      expect(shown.expectedValue).toBeGreaterThan(shown.zero);
-      expect(shown.expectedValue).toBeLessThan(shown.modest);
-    });
-
-    it('reports the probability in the assumptions even while hidden', () => {
-      // The UI needs the figure to label the opt-in itself ("show expected
-      // value at 20%"), so hiding the result must not hide the assumption.
-      expect(scenarios.assumptions.liquidityProbability).toBe(FALLBACK_LIQUIDITY_PROBABILITY);
-      expect(scenarios.expectedValue).toBe(0);
-    });
-
-    it('leaves zero, modest and strong untouched either way', () => {
-      const shown = privateEquityScenarios(privateGrant({ showExpectedValue: true }));
-      expect(shown.modest).toBeCloseTo(scenarios.modest, 2);
-      expect(shown.strong).toBeCloseTo(scenarios.strong, 2);
-      expect(shown.zero).toBe(scenarios.zero);
-    });
-  });
-
-  describe('liquidity probability has three sources, most specific first', () => {
-    it('uses a probability the user typed', () => {
-      const resolved = resolveLiquidityProbability(privateGrant({ liquidityProbability: 0.45 }));
-      expect(resolved).toEqual({ probability: 0.45, basis: 'entered' });
-    });
-
-    it('treats an entered 0 as a real answer, not as missing', () => {
-      // "This will never exit" is a legitimate thing to say, which is why the
-      // field is `number | null` rather than a number with 0 standing in for
-      // absent.
-      expect(resolveLiquidityProbability(privateGrant({ liquidityProbability: 0 }))).toEqual({
-        probability: 0,
-        basis: 'entered',
-      });
-    });
-
-    it('falls back to the funding stage when no probability was typed', () => {
-      const resolved = resolveLiquidityProbability(privateGrant({ stage: 'series_a' }));
-      expect(resolved).toEqual({ probability: 0.19, basis: 'stage' });
-    });
-
-    it.each(Object.entries(LIQUIDITY_PROBABILITY_BY_STAGE) as Array<[FundingStage, number]>)(
-      'maps %s to the observed exit rate of %s',
-      (stage, probability) => {
-        expect(resolveLiquidityProbability(privateGrant({ stage })).probability).toBe(probability);
-      }
-    );
-
-    it('rises monotonically with stage — later companies have survived more filters', () => {
-      const rates = Object.values(LIQUIDITY_PROBABILITY_BY_STAGE);
-      expect(rates).toEqual([...rates].sort((a, b) => a - b));
-      expect(new Set(rates).size).toBe(rates.length);
-    });
-
-    it('prefers what the user typed over the stage table', () => {
-      const resolved = resolveLiquidityProbability(
-        privateGrant({ stage: 'seed', liquidityProbability: 0.8 })
-      );
-      expect(resolved).toEqual({ probability: 0.8, basis: 'entered' });
-    });
-
-    it('falls back to the default with neither, and says so', () => {
-      expect(resolveLiquidityProbability(privateGrant())).toEqual({
-        probability: FALLBACK_LIQUIDITY_PROBABILITY,
-        basis: 'default',
-      });
-    });
-
-    it('pitches the fallback below the midpoint, toward the failure base rate', () => {
-      // Most startups fail, so an unknown stage defaults conservatively rather
-      // than to the middle of the table.
-      expect(FALLBACK_LIQUIDITY_PROBABILITY).toBeLessThan(LIQUIDITY_PROBABILITY_BY_STAGE.series_c);
-      expect(FALLBACK_LIQUIDITY_PROBABILITY).toBeGreaterThan(LIQUIDITY_PROBABILITY_BY_STAGE.seed);
-    });
-
-    it('clamps an absurd entered probability rather than inverting the scenario', () => {
-      expect(
-        resolveLiquidityProbability(privateGrant({ liquidityProbability: 5 })).probability
-      ).toBe(1);
-      expect(
-        resolveLiquidityProbability(privateGrant({ liquidityProbability: -2 })).probability
-      ).toBe(0);
-    });
-
-    it('surfaces the basis on the scenarios so the UI can label it', () => {
-      expect(privateEquityScenarios(privateGrant()).liquidityProbabilityBasis).toBe('default');
-      expect(
-        privateEquityScenarios(privateGrant({ stage: 'series_b' })).liquidityProbabilityBasis
-      ).toBe('stage');
-      expect(
-        privateEquityScenarios(privateGrant({ liquidityProbability: 0.5 }))
-          .liquidityProbabilityBasis
-      ).toBe('entered');
     });
   });
 
@@ -517,8 +381,6 @@ describe('no mode produces a non-finite number (Fixture C discipline)', () => {
       commonDiscount: Number.NaN,
       expectedDilution: 2,
       strongMultiple: Number.NaN,
-      liquidityProbability: -1,
-      showExpectedValue: true,
     }),
     optionGrant({
       grantShares: Number.NaN,
@@ -536,8 +398,8 @@ describe('no mode produces a non-finite number (Fixture C discipline)', () => {
         expect(Number.isFinite(item.annualValue)).toBe(true);
       }
       if (contribution.scenarios !== undefined) {
-        const { zero, modest, strong, expectedValue } = contribution.scenarios;
-        for (const value of [zero, modest, strong, expectedValue]) {
+        const { zero, modest, strong } = contribution.scenarios;
+        for (const value of [zero, modest, strong]) {
           expect(Number.isFinite(value)).toBe(true);
         }
       }

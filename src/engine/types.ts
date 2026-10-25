@@ -138,25 +138,6 @@ export interface EquityScenarios {
   /** Dollars per year at `modest × strongMultiple`. */
   strong: number;
   /**
-   * `modest × liquidityProbability`, or **0 when the user has not opted in**
-   * via `PrivateEquity.showExpectedValue`.
-   *
-   * Zeroed in the engine rather than left to the UI to hide. This is the
-   * shakiest figure the app can produce, and an opt-in enforced only by a
-   * forgotten `if` in a component is not an opt-in (invariant 6).
-   */
-  expectedValue: number;
-  /**
-   * Where `assumptions.liquidityProbability` came from, so the UI can label it
-   * honestly instead of presenting three quite different things as one number:
-   *
-   * - `entered` — the user typed a probability.
-   * - `stage`   — derived from the company's funding stage via
-   *               `LIQUIDITY_PROBABILITY_BY_STAGE`; sourced, not invented.
-   * - `default` — neither was given, so `DEFAULT_LIQUIDITY_PROBABILITY`.
-   */
-  liquidityProbabilityBasis: 'entered' | 'stage' | 'default';
-  /**
    * The assumptions that produced the above, echoed back for display so the UI
    * never has to reach into the input. Decimal rates and plain multiples;
    * keys match the `PrivateEquity` field names.
@@ -241,16 +222,6 @@ export type StipendTaxTreatment = 'taxable' | 'tax_free';
  * what DESIGN.md §2.3 calls the field ("Annual bonus (target %)").
  */
 export type BonusTreatment = 'target' | 'earned';
-
-/**
- * The funding stage of a private company at the time of the grant.
- *
- * Used only to pick a liquidity probability from
- * `LIQUIDITY_PROBABILITY_BY_STAGE`. `series_d_plus` is a bucket, not a round:
- * the observed exit rate flattens out past Series D and splitting it further
- * would imply precision the source does not support.
- */
-export type FundingStage = 'seed' | 'series_a' | 'series_b' | 'series_c' | 'series_d_plus';
 
 /** Hours and time off — the denominator's inputs (DESIGN.md §2.1). */
 export interface HoursInput {
@@ -360,23 +331,6 @@ export interface PrivateEquity {
   expectedDilution: number;
   /** Multiple on the last round for the `strong` scenario. Assumption. Default 3. */
   strongMultiple: number;
-  /**
-   * Funding stage at the time of the grant, or `null` if the user has not said.
-   * Picks a sourced liquidity probability from
-   * `LIQUIDITY_PROBABILITY_BY_STAGE` when `liquidityProbability` is `null`.
-   */
-  stage: FundingStage | null;
-  /**
-   * Probability of any liquidity event, decimal, or `null` to derive it.
-   *
-   * `null` means "work it out": from `stage` if one is set, otherwise from
-   * `DEFAULT_LIQUIDITY_PROBABILITY`. The same `number | null` convention
-   * `hoursWorkedOverride` and `EmployerMatch.capDollars` use — `null` is
-   * "derive", and `0` is a real answer meaning "this will never exit".
-   */
-  liquidityProbability: number | null;
-  /** When true the UI may show `expectedValue`. Never enters the headline. */
-  showExpectedValue: boolean;
 }
 
 /** Stock options: intrinsic value only, clamped at 0 (DESIGN.md §2.4). */
