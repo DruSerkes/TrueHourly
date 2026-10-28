@@ -31,7 +31,7 @@ pnpm dev                 # http://localhost:5173
 | `pnpm typecheck` | `tsc -b --noEmit`                                       |
 | `pnpm lint`      | ESLint, then a Prettier format check                    |
 | `pnpm format`    | Prettier write                                          |
-| `pnpm deploy`    | Build and push to Cloudflare Pages (see below)           |
+| `pnpm run deploy` | Build and push to Cloudflare Pages (see below)           |
 
 All four of `typecheck`, `test`, `lint` and `build` must pass before a change is committed.
 
@@ -53,7 +53,7 @@ architecture rather than with the deploy.
 
 ```sh
 pnpm dlx wrangler login          # interactive, opens a browser
-pnpm deploy                      # builds, then wrangler pages deploy dist
+pnpm run deploy                  # builds, then wrangler pages deploy dist
 ```
 
 **Or connect the Git repository** in the Cloudflare dashboard and use the table above. The build
